@@ -1,0 +1,22 @@
+# python
+__pycache__/
+.env/
+.venv/
+
+# jupyter
+.ipynb_checkpoints/
+
+# data
+data/
+
+# outputs
+output/
+
+# backup
+backup/
+*.bak
+
+# other
+.DS_Store
+tmp/
+.vscode/
