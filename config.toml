@@ -1,0 +1,36 @@
+DEBUG = false
+
+task = "forecasting" # options: forecasting, anomaly_detection, imputation, classification
+model = "dlinear"    # options: timellm, dlinear
+
+history_len = 96
+pred_len = 48
+
+
+[data]
+dataset = "ETTh1"
+mode = "multivariate"
+cols = "all"
+normalize = false
+step = 1
+
+
+[training]
+epochs = 10
+batch_size = 32
+optimizer = "adam"
+learning_rate = 0.0001
+dropout = 0.1
+
+loss = "mse"
+
+
+[models.dlinear]
+moving_avg = 25
+individual = false
+
+
+[setup]
+seed = 0
+device = "cpu"
+num_workers = 6

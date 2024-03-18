@@ -9,8 +9,10 @@ __pycache__/
 # data
 data/
 
-# outputs
-output/
+# logs
+outputs/
+logs/
+wandb/
 
 # backup
 backup/
