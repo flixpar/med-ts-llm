@@ -24,6 +24,8 @@ def get_dataset(config, split):
     if not config.task in dataset.supported_tasks:
         raise ValueError(f"Task {config.task} not supported by dataset {config.data.dataset}")
     
+    assert config.data.mode == "multivariate"
+    
     model_cls = model_lookup[config.model]
     if dataset.mode == "multivariate" and "multivariate" not in model_cls.supported_modes:
         dataset = Multi2UniDataset(dataset)
