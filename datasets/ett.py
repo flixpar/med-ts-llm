@@ -9,11 +9,12 @@ class ETTDataset(Dataset):
     def __init__(self, config, split):
         assert config.data.cols == "all"
         assert config.data.normalize == False
-        assert config.data.step == 1
 
         self.split = split
+        self.task = config.task
         self.history_len = config.history_len
         self.pred_len = config.pred_len
+        self.step_size = config.data.step
 
         basepath = Path(__file__).parent / "../data/ett/"
         datapath = basepath / (config.data.dataset + ".csv")
@@ -34,6 +35,7 @@ class ETTDataset(Dataset):
                 self.data = val
             case "test":
                 self.data = test
+                self.step_size = self.pred_len
             case _:
                 raise ValueError(f"Invalid split: {split}")
 
@@ -48,9 +50,10 @@ class ETTDataset(Dataset):
         self.supported_tasks = ["forecasting"]
 
     def __len__(self):
-        return self.data.shape[0] - self.history_len - self.pred_len + 1
+        return (self.data.shape[0] - self.history_len - self.pred_len) // self.step_size + 1
 
     def __getitem__(self, idx):
+        idx = idx * self.step_size
         x_range = (idx, idx + self.history_len)
         y_range = (x_range[1], x_range[1] + self.pred_len)
 
