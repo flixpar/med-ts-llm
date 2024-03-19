@@ -42,6 +42,17 @@ load_in_4bit = false
 llm_layers = 4
 
 
+[models.gpt4ts]
+d_ff = 768
+d_model = 768
+gpt_layers = 6
+train_mlp = false
+
+[models.gpt4ts.patching]
+patch_len = 1
+stride = 1
+
+
 [models.dlinear]
 moving_avg = 25
 individual = false
