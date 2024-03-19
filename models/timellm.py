@@ -7,6 +7,9 @@ import transformers
 from transformers import AutoConfig, AutoModel, AutoTokenizer
 transformers.logging.set_verbosity_error()
 
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 
 class TimeLLM(nn.Module):
 

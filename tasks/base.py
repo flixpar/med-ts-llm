@@ -137,6 +137,10 @@ class BaseTask(ABC):
         wandb.log({"epoch": self.epoch, "step": self.step} | scores | kwscores)
         self.epoch += 1
 
+        modeldir = self.logdir / "checkpoints"
+        modeldir.mkdir(parents=True, exist_ok=True)
+        torch.save(self.model.state_dict(), modeldir / "latest.pt")
+
     def get_device(self):
         return torch.device(self.config.setup.device)
 
