@@ -9,10 +9,10 @@ from .base import BaseTask
 
 class AnomalyDetectionTask(BaseTask):
 
-    def __init__(self, run_id, config):
+    def __init__(self, run_id, config, newrun=True):
         self.task = "anomaly_detection"
         assert config.history_len == config.pred_len, "Anomaly detection task requires history_len == pred_len"
-        super(AnomalyDetectionTask, self).__init__(run_id, config)
+        super(AnomalyDetectionTask, self).__init__(run_id, config, newrun)
 
     def train(self):
         for epoch in range(self.config.training.epochs):

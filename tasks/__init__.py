@@ -3,13 +3,12 @@ from .anomaly_detection import AnomalyDetectionTask
 from .semantic_segmentation import SemanticSegmentationTask
 
 
+task_lookup = {
+    "forecasting": ForecastTask,
+    "anomaly_detection": AnomalyDetectionTask,
+    "semantic_segmentation": SemanticSegmentationTask,
+}
+
 def get_trainer(run_id, config):
-    match config.task:
-        case "forecasting":
-            return ForecastTask(run_id=run_id, config=config)
-        case "anomaly_detection":
-            return AnomalyDetectionTask(run_id=run_id, config=config)
-        case "semantic_segmentation":
-            return SemanticSegmentationTask(run_id=run_id, config=config)
-        case _:
-            raise ValueError(f"Invalid task selection: {config.task}")
+    task_cls = task_lookup[config.task]
+    return task_cls(run_id, config)

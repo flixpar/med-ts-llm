@@ -13,14 +13,15 @@ import wandb
 
 from models import model_lookup
 from datasets import get_dataset
-from utils import set_seed
+from utils import set_seed, dict_to_object
 
 
 class BaseTask(ABC):
 
-    def __init__(self, run_id, config):
+    def __init__(self, run_id, config, newrun=True):
         self.run_id = run_id
         self.config = config
+        self.newrun = newrun
 
         self.device = self.get_device()
         self.dtype = self.get_dtype()
@@ -106,13 +107,14 @@ class BaseTask(ABC):
 
     def log_start(self):
         self.logdir = Path(__file__).parent / f"../outputs/logs/{self.run_id}/"
-        self.logdir.mkdir(parents=True)
+        self.logdir.mkdir(parents=True, exist_ok=True)
 
-        config_dict = self.config.to_dict()
-        with open(self.logdir / "config.toml", "w") as f:
-            toml.dump(config_dict, f)
-        with open(self.logdir / "config.json", "w") as f:
-            json.dump(config_dict, f, indent="\t")
+        if not self.newrun:
+            config_dict = self.config.to_dict()
+            with open(self.logdir / "config.toml", "w") as f:
+                toml.dump(config_dict, f)
+            with open(self.logdir / "config.json", "w") as f:
+                json.dump(config_dict, f, indent="\t")
 
         self.logger = wandb.init(
             project = "med-time-llm",
@@ -120,6 +122,7 @@ class BaseTask(ABC):
             id = self.run_id,
             dir = self.logdir,
             config = self.config.__dict__,
+            resume = "allow",
             mode = "online" if not self.config.DEBUG else "disabled",
         )
 
@@ -137,16 +140,40 @@ class BaseTask(ABC):
     def log_epoch(self, scores={}, **kwscores):
         self.logger.log({"epoch": self.epoch, "step": self.step} | scores | kwscores)
         self.epoch += 1
-
-        modeldir = self.logdir / "checkpoints"
-        modeldir.mkdir(parents=True, exist_ok=True)
-        torch.save(self.model.state_dict(), modeldir / "latest.pt")
+        self.save_state()
 
     def log_scores(self, scores={}, **kwscores):
         self.logger.log({"epoch": self.epoch, "step": self.step} | scores | kwscores)
+
+    def save_state(self):
+        modeldir = self.logdir / "checkpoints"
+        modeldir.mkdir(parents=True, exist_ok=True)
+
+        state = {
+            "epoch": self.epoch,
+            "step": self.step,
+            "model": self.model.state_dict(),
+        }
+        torch.save(state, modeldir / "latest.pt")
 
     def get_device(self):
         return torch.device(self.config.setup.device)
 
     def get_dtype(self):
         return torch.float32 if self.config.setup.device == "cpu" else torch.bfloat16
+
+    @classmethod
+    def from_run_id(cls, run_id):
+        basepath = Path(__file__).parent / f"../outputs/logs/{run_id}/"
+        config = toml.load(basepath / "config.toml")
+        config = dict_to_object(config)
+
+        trainer = cls(run_id, config, newrun=False)
+
+        modelpath = basepath / "checkpoints/latest.pt"
+        state = torch.load(modelpath)
+        trainer.model.load_state_dict(state["model"])
+        trainer.epoch = state["epoch"]
+        trainer.step = state["step"]
+
+        return trainer

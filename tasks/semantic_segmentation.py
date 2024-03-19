@@ -16,9 +16,9 @@ from .base import BaseTask
 
 class SemanticSegmentationTask(BaseTask):
 
-    def __init__(self, run_id, config):
+    def __init__(self, run_id, config, newrun=True):
         self.task = "semantic_segmentation"
-        super(SemanticSegmentationTask, self).__init__(run_id, config)
+        super(SemanticSegmentationTask, self).__init__(run_id, config, newrun)
 
     def train(self):
         for epoch in range(self.config.training.epochs):

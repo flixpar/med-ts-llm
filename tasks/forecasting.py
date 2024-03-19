@@ -8,9 +8,9 @@ from .base import BaseTask
 
 class ForecastTask(BaseTask):
 
-    def __init__(self, run_id, config):
+    def __init__(self, run_id, config, newrun=True):
         self.task = "forecasting"
-        super(ForecastTask, self).__init__(run_id, config)
+        super(ForecastTask, self).__init__(run_id, config, newrun)
 
     def train(self):
         for epoch in range(self.config.training.epochs):
