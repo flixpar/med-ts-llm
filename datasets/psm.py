@@ -1,3 +1,4 @@
+from abc import ABC
 from pathlib import Path
 
 import pandas as pd
@@ -6,7 +7,7 @@ import numpy as np
 from torch.utils.data import Dataset
 
 
-class PSMDataset(Dataset):
+class PSMDataset(Dataset, ABC):
     def __init__(self, config, split):
         assert config.data.cols == "all"
         assert config.data.normalize == False
@@ -27,13 +28,6 @@ class PSMDataset(Dataset):
 
         self.data = np.nan_to_num(data.values)
 
-        if self.split != "train" and self.task == "anomaly_detection":
-            labels = pd.read_csv(basepath / "test_label.csv")
-            labels = labels.drop(columns=["timestamp_(min)"])
-            self.labels = labels.values[:,0].astype(int)
-        else:
-            self.labels = None
-
         if config.data.normalize:
             raise NotImplementedError("Normalization not implemented")
 
@@ -45,23 +39,13 @@ class PSMDataset(Dataset):
         self.supported_tasks = ["forecasting", "anomaly_detection"]
         assert self.task in self.supported_tasks
 
-    def __len__(self):
-        if self.task == "forecasting":
-            return ((self.data.shape[0] - self.history_len - self.pred_len) // self.step_size) + 1
-        elif self.task == "anomaly_detection":
-            return ((self.data.shape[0] - self.pred_len) // self.step_size) + 1
-        else:
-            return 0
+
+class PSMForecastingDataset(PSMDataset):
+    def __init__(self, config, split):
+        super(PSMForecastingDataset, self).__init__(config, split)
+        assert self.task == "forecasting"
 
     def __getitem__(self, idx):
-        if self.task == "forecasting":
-            return self.getitem_forecast(idx)
-        elif self.task == "anomaly_detection":
-            return self.getitem_anomaly_detection(idx)
-        else:
-            return None
-
-    def getitem_forecast(self, idx):
         idx = idx * self.step_size
         x_range = (idx, idx + self.history_len)
         y_range = (x_range[1], x_range[1] + self.pred_len)
@@ -73,7 +57,24 @@ class PSMDataset(Dataset):
 
         return x, x_dec, y
 
-    def getitem_anomaly_detection(self, idx):
+    def __len__(self):
+        return (self.data.shape[0] - self.history_len - self.pred_len) // self.step_size + 1
+
+
+class PSMAnomalyDetectionDataset(PSMDataset):
+    def __init__(self, config, split):
+        super(PSMAnomalyDetectionDataset, self).__init__(config, split)
+        assert self.task == "anomaly_detection"
+
+        if self.split != "train":
+            basepath = Path(__file__).parent / "../data/psm/"
+            labels = pd.read_csv(basepath / "test_label.csv")
+            labels = labels.drop(columns=["timestamp_(min)"])
+            self.labels = labels.values[:,0].astype(int)
+        else:
+            self.labels = None
+
+    def __getitem__(self, idx):
         idx = idx * self.step_size
         x_range = (idx, idx + self.pred_len)
         x = self.data[slice(*x_range),:]
@@ -86,3 +87,15 @@ class PSMDataset(Dataset):
             labels = x[0:0,0]
 
         return x, x_dec, labels
+
+    def __len__(self):
+        return (self.data.shape[0] - self.pred_len) // self.step_size + 1
+
+
+def PSMDatasetSelector(config, split):
+    if config.task == "forecasting":
+        return PSMForecastingDataset(config, split)
+    elif config.task == "anomaly_detection":
+        return PSMAnomalyDetectionDataset(config, split)
+    else:
+        raise ValueError(f"Task {config.task} not supported by dataset {config.data.dataset}")

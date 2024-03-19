@@ -1,5 +1,5 @@
 from .ett import ETTDataset
-from .psm import PSMDataset
+from .psm import PSMDatasetSelector
 
 from .util import Multi2UniDataset
 
@@ -9,7 +9,7 @@ dataset_lookup = {
     "ETTh2": ETTDataset,
     "ETTm1": ETTDataset,
     "ETTm2": ETTDataset,
-    "PSM": PSMDataset,
+    "PSM": PSMDatasetSelector,
 }
 
 def get_dataset(config, split):
