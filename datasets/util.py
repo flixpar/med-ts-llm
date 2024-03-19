@@ -11,10 +11,20 @@ class Multi2UniDataset(Dataset):
         example_idx = index // self.n_features
         feature_idx = index % self.n_features
 
-        x_enc, x_dec, y = self.dataset[example_idx]
-        x_enc, x_dec, y = x_enc[:, feature_idx], x_dec[:, feature_idx], y[:, feature_idx]
-
-        return x_enc, x_dec, y
+        if self.task == "forecasting":
+            x_enc, x_dec, y = self.dataset[example_idx]
+            x_enc, y = x_enc[:, feature_idx], y[:, feature_idx]
+            return x_enc, x_dec, y
+        elif self.task == "anomaly_detection":
+            x_enc, x_dec, label = self.dataset[example_idx]
+            x_enc = x_enc[:, feature_idx]
+            return x_enc, x_dec, label
 
     def __len__(self):
         return len(self.dataset) * self.n_features
+    
+    def inverse_index(self, index):
+        example_idx = index // self.n_features
+        feature_idx = index % self.n_features
+        return example_idx, feature_idx
+

@@ -13,6 +13,11 @@ dataset_lookup = {
 def get_dataset(config, split):
     dataset_cls = dataset_lookup[config.data.dataset]
     dataset = dataset_cls(config, split)
+
+    if not config.task in dataset.supported_tasks:
+        raise ValueError(f"Task {config.task} not supported by dataset {config.data.dataset}")
+
     if config.data.mode == "univariate" and dataset.mode == "multivariate":
         dataset = Multi2UniDataset(dataset)
+
     return dataset

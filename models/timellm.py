@@ -177,6 +177,8 @@ class TimeLLM(nn.Module):
     def get_task_description(self):
         if self.task == "forecasting":
             self.task_description = f"Forecast the next {self.pred_len} steps given the previous {self.seq_len} steps of data."
+        elif self.task == "anomaly_detection":
+            self.task_description = f"Reconstruct the past {self.seq_len} steps of data as accurately as possible using the following information."
         else:
             raise ValueError(f"Task {self.task} is not supported.")
         return self.task_description

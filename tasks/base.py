@@ -51,6 +51,10 @@ class BaseTask(ABC):
     def test(self):
         pass
 
+    @abstractmethod
+    def score(self, pred, target):
+        pass
+
     def build_model(self):
         model_cls = model_lookup[self.config.model]
         self.model = model_cls(self.config, self.train_dataset)
