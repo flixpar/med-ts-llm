@@ -58,6 +58,7 @@ class BaseTask(ABC):
     def build_model(self):
         model_cls = model_lookup[self.config.model]
         self.model = model_cls(self.config, self.train_dataset)
+        assert self.task in self.model.supported_tasks, f"{self.task} not supported by {self.config.model}"
         return self.model
 
     def build_optimizer(self):

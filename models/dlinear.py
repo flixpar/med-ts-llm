@@ -8,6 +8,9 @@ class DLinear(nn.Module):
     Paper link: https://arxiv.org/pdf/2205.13504.pdf
     """
 
+    supported_tasks = ["forecasting", "anomaly_detection", "imputation", "classification"]
+    supported_modes = ["multivariate"]
+
     def __init__(self, config, dataset):
         super(DLinear, self).__init__()
 

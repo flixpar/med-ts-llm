@@ -4,6 +4,7 @@ from .msl import MSLDatasetSelector
 from .ecg import ECGMITDatasetSelector
 
 from .util import Multi2UniDataset
+from models import model_lookup
 
 
 dataset_lookup = {
@@ -22,8 +23,9 @@ def get_dataset(config, split):
 
     if not config.task in dataset.supported_tasks:
         raise ValueError(f"Task {config.task} not supported by dataset {config.data.dataset}")
-
-    if config.data.mode == "univariate" and dataset.mode == "multivariate":
+    
+    model_cls = model_lookup[config.model]
+    if dataset.mode == "multivariate" and "multivariate" not in model_cls.supported_modes:
         dataset = Multi2UniDataset(dataset)
 
     return dataset

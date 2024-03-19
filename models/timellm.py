@@ -13,6 +13,9 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 class TimeLLM(nn.Module):
 
+    supported_tasks = ["forecasting", "anomaly_detection"]
+    supported_modes = ["univariate"]
+
     def __init__(self, config, dataset):
         super(TimeLLM, self).__init__()
         self.config = config
