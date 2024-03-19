@@ -34,7 +34,6 @@ class AnomalyDetectionTask(BaseTask):
             self.log_epoch(val_scores)
 
         self.model.eval()
-        self.log_end()
 
     def val(self):
         self.model.eval()
@@ -57,6 +56,6 @@ class AnomalyDetectionTask(BaseTask):
 
     def score(self, pred, target):
         return {
-            "recon_mse": F.mse_loss(pred, target),
-            "recon_mae": F.l1_loss(pred, target),
+            "recon_mse": F.mse_loss(pred, target).item(),
+            "recon_mae": F.l1_loss(pred, target).item(),
         }

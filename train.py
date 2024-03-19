@@ -13,7 +13,11 @@ def main(config_path):
     trainer = get_trainer(run_id, config)
 
     trainer.train()
-    trainer.test()
+    test_scores = trainer.test()
+    trainer.log_end()
+
+    print("Test results:", test_scores)
+    print("Run ID:", run_id)
 
 if __name__ == "__main__":
     config_path = sys.argv[1] if len(sys.argv) > 1 else "configs/config.toml"

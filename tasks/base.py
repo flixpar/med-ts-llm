@@ -114,7 +114,7 @@ class BaseTask(ABC):
         with open(self.logdir / "config.json", "w") as f:
             json.dump(config_dict, f, indent="\t")
 
-        wandb.init(
+        self.logger = wandb.init(
             project = "med-time-llm",
             name = self.run_id,
             id = self.run_id,
@@ -124,23 +124,26 @@ class BaseTask(ABC):
         )
 
     def log_end(self):
-        wandb.finish()
+        self.logger.finish()
 
     def log_step(self, loss):
         self.step += 1
-        wandb.log({
+        self.logger.log({
             "epoch": self.epoch,
             "step": self.step,
             "train_loss": loss,
         })
 
     def log_epoch(self, scores={}, **kwscores):
-        wandb.log({"epoch": self.epoch, "step": self.step} | scores | kwscores)
+        self.logger.log({"epoch": self.epoch, "step": self.step} | scores | kwscores)
         self.epoch += 1
 
         modeldir = self.logdir / "checkpoints"
         modeldir.mkdir(parents=True, exist_ok=True)
         torch.save(self.model.state_dict(), modeldir / "latest.pt")
+
+    def log_scores(self, scores={}, **kwscores):
+        self.logger.log({"epoch": self.epoch, "step": self.step} | scores | kwscores)
 
     def get_device(self):
         return torch.device(self.config.setup.device)

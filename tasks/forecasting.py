@@ -34,7 +34,6 @@ class ForecastTask(BaseTask):
             self.log_epoch(val_scores)
 
         self.model.eval()
-        self.log_end()
 
     def val(self):
         self.model.eval()
@@ -70,6 +69,6 @@ class ForecastTask(BaseTask):
 
     def score(self, pred, target):
         return {
-            "mse": F.mse_loss(pred, target),
-            "mae": F.l1_loss(pred, target),
+            "mse": F.mse_loss(pred, target).item(),
+            "mae": F.l1_loss(pred, target).item(),
         }
