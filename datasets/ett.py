@@ -43,6 +43,8 @@ class ETTDataset(Dataset):
         self.n_features = self.data.shape[1]
         self.mode = "multivariate"
 
+        self.description = "The Electricity Transformer Temperature (ETT) is a crucial indicator in the electric power long-term deployment."
+
     def __len__(self):
         return self.data.shape[0] - self.history_len - self.pred_len + 1
 

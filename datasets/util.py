@@ -4,7 +4,7 @@ from torch.utils.data import Dataset
 class Multi2UniDataset(Dataset):
     def __init__(self, dataset):
         self.dataset = dataset
-        self.n_features = dataset.n_features
+        self.n_features = 1
         self.__dict__.update(dataset.__dict__)
 
     def __getitem__(self, index):
