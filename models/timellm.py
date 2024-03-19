@@ -7,6 +7,9 @@ import transformers
 from transformers import AutoConfig, AutoModel, AutoTokenizer
 transformers.logging.set_verbosity_error()
 
+from .layers.embed import PatchEmbedding
+from .layers.RevIN import RevIN
+
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -41,9 +44,9 @@ class TimeLLM(nn.Module):
 
         self.setup_llm()
 
-        self.normalize_layers = Normalize(dataset.n_features, affine=False)
+        self.normalize_layers = RevIN(dataset.n_features, affine=False)
         self.mapping_layer = nn.Linear(self.vocab_size, self.num_tokens)
-        self.patch_embedding = PatchEmbedding(self.d_model, self.patch_len, self.stride, self.dropout)
+        self.patch_embedding = PatchEmbedding(self.d_model, self.patch_len, self.stride, self.dropout, pos_embed=False)
         self.reprogramming_layer = ReprogrammingLayer(self.d_model, self.n_attention_heads, self.d_ff, self.d_llm, attention_dropout=self.dropout)
         self.output_projection = FlattenHead(dataset.n_features, self.d_ff * self.n_patches, self.pred_len, head_dropout=0)
 
@@ -252,139 +255,3 @@ class ReprogrammingLayer(nn.Module):
         reprogramming_embedding = torch.einsum("bhls,she->blhe", A, value_embedding)
 
         return reprogramming_embedding
-
-
-class PatchEmbedding(nn.Module):
-    def __init__(self, d_model, patch_len, stride, dropout):
-        super(PatchEmbedding, self).__init__()
-        # Patching
-        self.patch_len = patch_len
-        self.stride = stride
-        self.padding_patch_layer = ReplicationPad1d((0, stride))
-
-        # Backbone, Input encoding: projection of feature vectors onto a d-dim vector space
-        self.value_embedding = TokenEmbedding(patch_len, d_model)
-
-        # Positional embedding
-        # self.position_embedding = PositionalEmbedding(d_model)
-
-        # Residual dropout
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self, x):
-        # do patching
-        n_vars = x.shape[1]
-        x = self.padding_patch_layer(x)
-        x = x.unfold(dimension=-1, size=self.patch_len, step=self.stride)
-        x = torch.reshape(x, (x.shape[0] * x.shape[1], x.shape[2], x.shape[3]))
-        # Input encoding
-        x = self.value_embedding(x)
-        return self.dropout(x), n_vars
-
-
-class PositionalEmbedding(nn.Module):
-    def __init__(self, d_model, max_len=5000):
-        super(PositionalEmbedding, self).__init__()
-
-        position = torch.arange(0, max_len).float().unsqueeze(1)
-        div_term = (torch.arange(0, d_model, 2).float() * -(math.log(10_000.0) / d_model)).exp()
-
-        pe = torch.zeros(max_len, d_model).float()
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0)
-
-        self.register_buffer("pe", pe)
-
-    def forward(self, x):
-        return self.pe[:, :x.size(1)]
-
-
-class TokenEmbedding(nn.Module):
-    def __init__(self, c_in, d_model):
-        super(TokenEmbedding, self).__init__()
-        self.tokenConv = nn.Conv1d(in_channels=c_in, out_channels=d_model, kernel_size=3, padding=1, padding_mode="circular", bias=False)
-        for m in self.modules():
-            if isinstance(m, nn.Conv1d):
-                nn.init.kaiming_normal_(m.weight, mode="fan_in", nonlinearity="leaky_relu")
-
-    def forward(self, x):
-        x = self.tokenConv(x.permute(0, 2, 1)).transpose(1, 2)
-        return x
-
-
-class Normalize(nn.Module):
-    def __init__(self, num_features: int, eps=1e-5, affine=False, subtract_last=False, non_norm=False):
-        """
-        :param num_features: the number of features or channels
-        :param eps: a value added for numerical stability
-        :param affine: if True, RevIN has learnable affine parameters
-        """
-        super(Normalize, self).__init__()
-        self.num_features = num_features
-        self.eps = eps
-        self.affine = affine
-        self.subtract_last = subtract_last
-        self.non_norm = non_norm
-        if self.affine:
-            self._init_params()
-
-    def forward(self, x, mode: str):
-        if mode == "norm":
-            self._get_statistics(x)
-            x = self._normalize(x)
-        elif mode == "denorm":
-            x = self._denormalize(x)
-        else:
-            raise NotImplementedError
-        return x
-
-    def _init_params(self):
-        # initialize RevIN params: (C,)
-        self.affine_weight = nn.Parameter(torch.ones(self.num_features))
-        self.affine_bias = nn.Parameter(torch.zeros(self.num_features))
-
-    def _get_statistics(self, x):
-        dim2reduce = tuple(range(1, x.ndim - 1))
-        if self.subtract_last:
-            self.last = x[:, -1, :].unsqueeze(1)
-        else:
-            self.mean = torch.mean(x, dim=dim2reduce, keepdim=True).detach()
-        self.stdev = torch.sqrt(torch.var(x, dim=dim2reduce, keepdim=True, unbiased=False) + self.eps).detach()
-
-    def _normalize(self, x):
-        if self.non_norm:
-            return x
-        if self.subtract_last:
-            x = x - self.last
-        else:
-            x = x - self.mean
-        x = x / self.stdev
-        if self.affine:
-            x = x * self.affine_weight
-            x = x + self.affine_bias
-        return x
-
-    def _denormalize(self, x):
-        if self.non_norm:
-            return x
-        if self.affine:
-            x = x - self.affine_bias
-            x = x / (self.affine_weight + self.eps * self.eps)
-        x = x * self.stdev
-        if self.subtract_last:
-            x = x + self.last
-        else:
-            x = x + self.mean
-        return x
-
-
-class ReplicationPad1d(nn.Module):
-    def __init__(self, padding) -> None:
-        super(ReplicationPad1d, self).__init__()
-        self.padding = padding
-
-    def forward(self, input):
-        replicate_padding = input[:, :, -1].unsqueeze(-1).repeat(1, 1, self.padding[-1])
-        output = torch.cat([input, replicate_padding], dim=-1)
-        return output
