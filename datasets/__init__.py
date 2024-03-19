@@ -2,6 +2,7 @@ from .ett import ETTDataset
 from .psm import PSMDatasetSelector
 from .msl import MSLDatasetSelector
 from .ecg import ECGMITDatasetSelector
+from .ventilator import VentilatorDatasetSelector
 
 from .util import Multi2UniDataset
 from models import model_lookup
@@ -15,6 +16,7 @@ dataset_lookup = {
     "PSM": PSMDatasetSelector,
     "MSL": MSLDatasetSelector,
     "ECG": ECGMITDatasetSelector,
+    "ventilator": VentilatorDatasetSelector,
 }
 
 def get_dataset(config, split):
