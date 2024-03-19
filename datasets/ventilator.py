@@ -2,6 +2,7 @@ from abc import ABC
 from pathlib import Path
 
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
 from torch.utils.data import Dataset
 
@@ -12,7 +13,6 @@ class VentilatorDataset(Dataset, ABC):
 
     def __init__(self, config, split):
         assert config.data.cols == "all"
-        assert config.data.normalize == False
         assert config.task in self.supported_tasks
 
         self.split = split
@@ -40,7 +40,8 @@ class VentilatorForecastingDataset(VentilatorDataset):
         self.data = pd.concat(dfs, ignore_index=True).values
 
         if config.data.normalize:
-            raise NotImplementedError("Normalization not implemented")
+            self.normalizer = StandardScaler()
+            self.data = self.normalizer.fit_transform(self.data)
 
         self.n_points = self.data.shape[0]
         self.n_features = self.data.shape[1]
@@ -80,7 +81,8 @@ class VentilatorSemanticSegmentationDataset(VentilatorDataset):
         self.labels = data[:,1].astype(int)
 
         if config.data.normalize:
-            raise NotImplementedError("Normalization not implemented")
+            self.normalizer = StandardScaler()
+            self.data = self.normalizer.fit_transform(self.data)
 
         self.n_points = self.data.shape[0]
         self.n_features = self.data.shape[1]

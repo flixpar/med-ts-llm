@@ -2,7 +2,7 @@ from abc import ABC
 from pathlib import Path
 
 import pandas as pd
-import numpy as np
+from sklearn.preprocessing import StandardScaler
 
 from torch.utils.data import Dataset
 
@@ -10,7 +10,6 @@ from torch.utils.data import Dataset
 class ECGMITDataset(Dataset, ABC):
     def __init__(self, config, split):
         assert config.data.cols == "all"
-        assert config.data.normalize == False
 
         self.split = split
         self.task = config.task
@@ -28,7 +27,8 @@ class ECGMITDataset(Dataset, ABC):
         self.data = data.values
 
         if config.data.normalize:
-            raise NotImplementedError("Normalization not implemented")
+            self.normalizer = StandardScaler()
+            self.data = self.normalizer.fit_transform(self.data)
 
         self.n_points = self.data.shape[0]
         self.n_features = self.data.shape[1]

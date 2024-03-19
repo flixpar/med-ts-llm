@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
 from torch.utils.data import Dataset
 
@@ -8,7 +9,6 @@ from torch.utils.data import Dataset
 class ETTDataset(Dataset):
     def __init__(self, config, split):
         assert config.data.cols == "all"
-        assert config.data.normalize == False
 
         self.split = split
         self.task = config.task
@@ -40,7 +40,8 @@ class ETTDataset(Dataset):
                 raise ValueError(f"Invalid split: {split}")
 
         if config.data.normalize:
-            pass
+            self.normalizer = StandardScaler()
+            self.data = self.normalizer.fit_transform(self.data)
 
         self.n_points = self.data.shape[0]
         self.n_features = self.data.shape[1]
