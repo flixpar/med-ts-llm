@@ -12,12 +12,12 @@ dataset = "ETTh1"
 mode = "univariate"
 cols = "all"
 normalize = false
-step = 1
+step = 48
 
 
 [training]
 epochs = 10
-batch_size = 32
+batch_size = 16
 optimizer = "adam"
 learning_rate = 0.0001
 dropout = 0.1
