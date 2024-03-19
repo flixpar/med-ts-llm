@@ -1,5 +1,6 @@
 from .forecasting import ForecastTask
 from .anomaly_detection import AnomalyDetectionTask
+from .semantic_segmentation import SemanticSegmentationTask
 
 
 def get_trainer(run_id, config):
@@ -8,5 +9,7 @@ def get_trainer(run_id, config):
             return ForecastTask(run_id=run_id, config=config)
         case "anomaly_detection":
             return AnomalyDetectionTask(run_id=run_id, config=config)
+        case "semantic_segmentation":
+            return SemanticSegmentationTask(run_id=run_id, config=config)
         case _:
             raise ValueError(f"Invalid task selection: {config.task}")

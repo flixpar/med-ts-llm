@@ -2,6 +2,7 @@ import math
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 import transformers
 from transformers import AutoConfig, AutoModel, AutoTokenizer
@@ -16,7 +17,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 class TimeLLM(nn.Module):
 
-    supported_tasks = ["forecasting", "anomaly_detection"]
+    supported_tasks = ["forecasting", "anomaly_detection", "semantic_segmentation"]
     supported_modes = ["univariate"]
 
     def __init__(self, config, dataset):
@@ -57,6 +58,10 @@ class TimeLLM(nn.Module):
                 nn.Linear(self.d_llm, self.d_ff),
                 nn.LayerNorm(self.d_ff),
             )
+
+        if self.task == "semantic_segmentation":
+            if dataset.n_classes != 2:
+                raise ValueError("TimeLLM only supports binary classification")
 
     def setup_llm(self):
         self.llm_enabled = self.model_config.llm.enabled
@@ -103,11 +108,12 @@ class TimeLLM(nn.Module):
                 param.requires_grad = False
 
     def forward(self, x_enc, x_dec):
+        forecast_fn = self.forecast if self.llm_enabled else self.forecast_nollm
         if self.task in ["forecasting", "anomaly_detection"]:
-            if self.llm_enabled:
-                pred = self.forecast(x_enc, x_dec)
-            else:
-                pred = self.forecast_nollm(x_enc, x_dec)
+            return forecast_fn(x_enc, x_dec)
+        if self.task == "semantic_segmentation":
+            pred = forecast_fn(x_enc, x_dec)
+            pred = F.sigmoid(pred)
             return pred
         else:
             raise ValueError(f"Task {self.task_name} not implemented")
@@ -188,6 +194,8 @@ class TimeLLM(nn.Module):
             self.task_description = f"Forecast the next {self.pred_len} steps given the previous {self.seq_len} steps of data."
         elif self.task == "anomaly_detection":
             self.task_description = f"Reconstruct the past {self.seq_len} steps of data as accurately as possible using the following information."
+        elif self.task == "semantic_segmentation":
+            self.task_description = f"Classify the past {self.seq_len} steps of data as accurately as possible using the following information."
         else:
             raise ValueError(f"Task {self.task} is not supported.")
         return self.task_description

@@ -20,6 +20,12 @@ class Multi2UniDataset(Dataset):
             x_enc, x_dec, label = self.dataset[example_idx]
             x_enc = x_enc[:, feature_idx]
             return x_enc, x_dec, label
+        elif self.task == "semantic_segmentation":
+            x, x_dec, y = self.dataset[example_idx]
+            x = x[:, feature_idx]
+            return x, x_dec, y
+        else:
+            raise ValueError(f"Task {self.task} not supported by Multi2UniDataset")
 
     def __len__(self):
         return len(self.dataset) * self.real_features
