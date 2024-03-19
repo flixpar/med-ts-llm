@@ -42,6 +42,7 @@ class ETTDataset(Dataset):
         if config.data.normalize:
             pass
 
+        self.n_points = self.data.shape[0]
         self.n_features = self.data.shape[1]
         self.mode = "multivariate"
 
@@ -50,7 +51,7 @@ class ETTDataset(Dataset):
         self.supported_tasks = ["forecasting"]
 
     def __len__(self):
-        return (self.data.shape[0] - self.history_len - self.pred_len) // self.step_size + 1
+        return (self.n_points - self.history_len - self.pred_len + 1) // self.step_size
 
     def __getitem__(self, idx):
         idx = idx * self.step_size
@@ -63,3 +64,6 @@ class ETTDataset(Dataset):
         x_dec = x[0:0,:]
 
         return x, x_dec, y
+
+    def inverse_index(self, idx):
+        return idx * self.step_size + self.history_len

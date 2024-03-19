@@ -31,6 +31,7 @@ class PSMDataset(Dataset, ABC):
         if config.data.normalize:
             raise NotImplementedError("Normalization not implemented")
 
+        self.n_points = self.data.shape[0]
         self.n_features = self.data.shape[1]
         self.mode = "multivariate"
 
@@ -58,7 +59,10 @@ class PSMForecastingDataset(PSMDataset):
         return x, x_dec, y
 
     def __len__(self):
-        return (self.data.shape[0] - self.history_len - self.pred_len) // self.step_size + 1
+        return (self.n_points - self.history_len - self.pred_len + 1) // self.step_size
+
+    def inverse_index(self, idx):
+        return idx * self.step_size + self.history_len
 
 
 class PSMAnomalyDetectionDataset(PSMDataset):
@@ -89,7 +93,10 @@ class PSMAnomalyDetectionDataset(PSMDataset):
         return x, x_dec, labels
 
     def __len__(self):
-        return (self.data.shape[0] - self.pred_len) // self.step_size + 1
+        return self.n_points // self.step_size
+
+    def inverse_index(self, idx):
+        return idx * self.step_size
 
 
 def PSMDatasetSelector(config, split):
