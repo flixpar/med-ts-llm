@@ -133,7 +133,7 @@ class VentilatorSemanticSegmentationDataset(VentilatorDataset):
         return x, x_dec, y
 
     def __len__(self):
-        return (self.n_points - self.pred_len + 1) // self.step_size
+        return (self.n_points - self.pred_len) // self.step_size + 1
 
     def inverse_index(self, idx):
         return idx * self.step_size
