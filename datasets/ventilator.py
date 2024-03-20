@@ -37,11 +37,26 @@ class VentilatorForecastingDataset(VentilatorDataset):
         basepath = Path(__file__).parent / "../data/ventilator/v1/"
         waveform_files = basepath.glob("*.csv")
         dfs = [pd.read_csv(f, usecols=["pressure", "flow"]) for f in waveform_files]
-        self.data = pd.concat(dfs, ignore_index=True).values
+        data = pd.concat(dfs, ignore_index=True).values
+
+        train_pct, val_pct, test_pct = 0.7, 0.15, 0.15
+        train_idx = int(train_pct * data.shape[0])
+        val_idx = int((train_pct + val_pct) * data.shape[0])
+        train = data[:train_idx,:]
+
+        match split:
+            case "train":
+                self.data = train
+            case "val":
+                self.data = data[train_idx:val_idx,:]
+            case "test":
+                self.data = data[val_idx:,:]
+            case _:
+                raise ValueError(f"Invalid split: {split}")
 
         if config.data.normalize:
-            self.normalizer = StandardScaler()
-            self.data = self.normalizer.fit_transform(self.data)
+            self.normalizer = StandardScaler().fit(train)
+            self.data = self.normalizer.transform(self.data)
 
         self.n_points = self.data.shape[0]
         self.n_features = self.data.shape[1]
@@ -77,12 +92,31 @@ class VentilatorSemanticSegmentationDataset(VentilatorDataset):
         data = pd.concat(dfs, ignore_index=True)
         data = data[data.label >= 0].reset_index(drop=True)
         data = data.values
-        self.data = data[:,0:1]
-        self.labels = data[:,1].astype(int)
+
+        labels = data[:,1].astype(int)
+        data = data[:,0:1]
+
+        train_pct, val_pct, test_pct = 0.7, 0.15, 0.15
+        train_idx = int(train_pct * data.shape[0])
+        val_idx = int((train_pct + val_pct) * data.shape[0])
+        train = data[:train_idx]
+
+        match split:
+            case "train":
+                self.data = train
+                self.labels = labels[:train_idx]
+            case "val":
+                self.data = data[train_idx:val_idx]
+                self.labels = labels[train_idx:val_idx]
+            case "test":
+                self.data = data[val_idx:]
+                self.labels = labels[val_idx:]
+            case _:
+                raise ValueError(f"Invalid split: {split}")
 
         if config.data.normalize:
-            self.normalizer = StandardScaler()
-            self.data = self.normalizer.fit_transform(self.data)
+            self.normalizer = StandardScaler().fit(train)
+            self.data = self.normalizer.transform(self.data)
 
         self.n_points = self.data.shape[0]
         self.n_features = self.data.shape[1]
@@ -99,7 +133,7 @@ class VentilatorSemanticSegmentationDataset(VentilatorDataset):
         return x, x_dec, y
 
     def __len__(self):
-        return self.n_points // self.step_size
+        return (self.n_points - self.pred_len + 1) // self.step_size
 
     def inverse_index(self, idx):
         return idx * self.step_size
