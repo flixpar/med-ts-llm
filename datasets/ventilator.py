@@ -36,6 +36,7 @@ class VentilatorForecastingDataset(VentilatorDataset):
 
         basepath = Path(__file__).parent / "../data/ventilator/v1/"
         waveform_files = basepath.glob("*.csv")
+        waveform_files = sorted(waveform_files)
         dfs = [pd.read_csv(f, usecols=["pressure", "flow"]) for f in waveform_files]
         data = pd.concat(dfs, ignore_index=True).values
 
@@ -88,9 +89,12 @@ class VentilatorSemanticSegmentationDataset(VentilatorDataset):
 
         basepath = Path(__file__).parent / "../data/ventilator/v2/"
         waveform_files = basepath.glob("*.csv")
-        dfs = [pd.read_csv(f, usecols=["pressure", "label"]) for f in waveform_files]
+        waveform_files = [fn for fn in waveform_files if fn.name != "patient_704_vent_w_1_labeled.csv"]
+        waveform_files = sorted(waveform_files)
+        dfs = [pd.read_csv(f, usecols=["flow", "label"]) for f in waveform_files]
+        dfs = [df[df.label >= 0] for df in dfs]
+        dfs = [df for df in dfs if len(df) > 1000]
         data = pd.concat(dfs, ignore_index=True)
-        data = data[data.label >= 0].reset_index(drop=True)
         data = data.values
 
         labels = data[:,1].astype(int)
