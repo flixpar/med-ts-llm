@@ -1,6 +1,14 @@
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
+
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    jaccard_score,
+    roc_auc_score,
+)
 
 from tqdm import tqdm
 
@@ -123,15 +131,14 @@ class AnomalyDetectionTask(BaseTask):
         }
 
     def score_anomalies(self, pred, target):
-        accuracy = (pred == target).float().mean()
-        precision = (pred * target).sum() / pred.sum()
-        recall = (pred * target).sum() / target.sum()
-        f1 = 2 * (precision * recall) / (precision + recall)
+        pred, target = pred.cpu().numpy(), target.cpu().numpy()
         return {
-            "accuracy": accuracy.item(),
-            "precision": precision.item(),
-            "recall": recall.item(),
-            "f1": f1.item(),
+            "accuracy": accuracy_score(target, pred),
+            "f1": f1_score(target, pred, average="binary", zero_division=0),
+            "auroc": roc_auc_score(target, pred),
+            "precision": precision_score(target, pred, average="binary", zero_division=0),
+            "recall": recall_score(target, pred, average="binary", zero_division=0),
+            "iou": jaccard_score(target, pred, average="binary", zero_division=0),
         }
 
 def adjust_anomalies(pred, gt):
