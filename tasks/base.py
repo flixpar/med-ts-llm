@@ -67,7 +67,7 @@ class BaseTask(ABC):
             case "adam":
                 self.optimizer = optim.Adam(self.model.parameters(), lr=self.config.training.learning_rate)
             case _:
-                raise ValueError(f"Invalid optimizer selection: {self.config.optimizer}")
+                raise ValueError(f"Invalid optimizer selection: {self.config.training.optimizer}")
         return self.optimizer
 
     def build_loss(self):
@@ -109,7 +109,7 @@ class BaseTask(ABC):
         self.logdir = Path(__file__).parent / f"../outputs/logs/{self.run_id}/"
         self.logdir.mkdir(parents=True, exist_ok=True)
 
-        if not self.newrun:
+        if self.newrun:
             config_dict = self.config.to_dict()
             with open(self.logdir / "config.toml", "w") as f:
                 toml.dump(config_dict, f)
@@ -130,7 +130,7 @@ class BaseTask(ABC):
         self.logger.finish()
 
     def log_step(self, loss):
-        self.step += 1
+        self.step += self.config.training.batch_size
         self.logger.log({
             "epoch": self.epoch,
             "step": self.step,

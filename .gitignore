@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 
 # jupyter
+*.ipynb
 .ipynb_checkpoints/
 
 # data
