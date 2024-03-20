@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from .base import BaseTask
+from utils import dict_to_object
 
 
 class AnomalyDetectionTask(BaseTask):
@@ -53,61 +54,67 @@ class AnomalyDetectionTask(BaseTask):
         return mean_scores
 
     def test(self):
+        results = self.predict(self.test_dataloader)
+
+        scores = self.score_anomalies(results.anomaly_preds, results.anomaly_labels)
+        scores = {f"test_{metric}": value for metric, value in scores.items()}
+        self.log_scores(scores)
+
+        return scores
+
+    def predict(self, dataloader):
         self.model.eval()
 
-        self.test_dataloader = DataLoader(
-            self.test_dataset,
-            batch_size = 1,
-            shuffle = False,
-            num_workers = self.config.setup.num_workers,
-        )
+        dataset = dataloader.dataset
+        pred_len = self.config.pred_len
+        step_size = dataset.step_size
+        dataset_len = ((dataset.n_points - pred_len) // step_size) + 1
+        n_points = pred_len + ((dataset_len - 1) * step_size)
 
-        assert self.test_dataset.step_size == self.config.pred_len
-        assert self.test_dataloader.batch_size == 1
+        n_features = getattr(dataset, "real_features", dataset.n_features)
+        bs = dataloader.batch_size
 
-        dataset_len = self.test_dataset.n_points - (self.test_dataset.n_points % self.config.pred_len)
-        is_multi2uni = self.test_dataset.__class__.__name__ == "Multi2UniDataset"
-        n_features = self.test_dataset.real_features if is_multi2uni else self.test_dataset.n_features
-
-        preds = torch.full((dataset_len, n_features), float("nan"))
-        targets = torch.full((dataset_len, n_features), float("nan"))
-        labels = torch.full((dataset_len,), -1, dtype=torch.int)
+        preds = torch.full((n_points, n_features), float("nan"))
+        targets = torch.full((n_points, n_features), float("nan"))
+        labels = torch.full((n_points,), -1, dtype=torch.int)
 
         with torch.no_grad():
-            for idx, (x_enc, x_dec, label) in tqdm(enumerate(self.test_dataloader), total=len(self.test_dataloader)):
+            for idx, (x_enc, x_dec, label) in tqdm(enumerate(dataloader), total=len(dataloader)):
                 x_enc = x_enc.to(self.device, self.dtype)
                 x_dec = x_dec.to(self.device, self.dtype)
-                label = label.to(self.device, self.dtype)
 
                 pred = self.model(x_enc, x_dec)
 
-                pred, x_enc, label = pred.squeeze(), x_enc.squeeze(), label.squeeze()
+                for j in range(pred.size(0)):
+                    inds = dataset.inverse_index((idx * bs) + j)
+                    time_idx, feature_idx = inds if isinstance(inds, tuple) else (inds, slice(None))
+                    time_idx = slice(time_idx, time_idx + pred.size(1))
 
-                if is_multi2uni:
-                    time_idx, feature_idx = self.test_dataset.inverse_index(idx)
-                else:
-                    time_idx, feature_idx = idx, slice(None)
-                time_idx = slice(time_idx, time_idx + pred.size(0))
-
-                preds[time_idx, feature_idx] = pred.cpu().detach()
-                targets[time_idx, feature_idx] = x_enc.cpu().detach()
-                labels[time_idx] = label.cpu().detach()
+                    preds[time_idx, feature_idx] = pred[j].squeeze().cpu().detach()
+                    targets[time_idx, feature_idx] = x_enc[j].squeeze().cpu().detach()
+                    labels[time_idx] = label[j].squeeze().cpu().detach()
 
         assert not torch.isnan(preds).any()
         assert not torch.isnan(targets).any()
         assert not (labels < 0).any()
 
-        scores = F.mse_loss(preds, targets, reduction="none").mean(dim=-1)
+        scores = F.mse_loss(preds, targets, reduction="none")
+        mean_scores = scores.mean(dim=0)
+        scores = scores / mean_scores.unsqueeze(0)
+        scores = scores.nanmean(dim=1)
+
         threshold = scores.quantile(torch.tensor(0.9))
         anomalies = (scores > threshold).to(torch.int)
-
         anomalies = adjust_anomalies(anomalies, labels)
 
-        scores = self.score_anomalies(anomalies, labels)
-        scores = {f"test_{metric}": value for metric, value in scores.items()}
-        self.log_scores(scores)
-
-        return scores
+        results = {
+            "recon_preds": preds,
+            "recon_targets": targets,
+            "anomaly_labels": labels,
+            "anomaly_scores": scores,
+            "anomaly_preds": anomalies
+        }
+        return dict_to_object(results)
 
     def score(self, pred, target):
         return {
