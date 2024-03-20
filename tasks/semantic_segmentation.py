@@ -44,36 +44,57 @@ class SemanticSegmentationTask(BaseTask):
         self.model.eval()
 
     def val(self):
-        self.model.eval()
-        scores = []
-        with torch.no_grad():
-            for (x_enc, x_dec, target) in tqdm(self.val_dataloader):
-                x_enc = x_enc.to(self.device, self.dtype)
-                x_dec = x_dec.to(self.device, self.dtype)
-                target = target.to(self.device, self.dtype)
-
-                pred = self.model(x_enc, x_dec)
-                batch_scores = self.score(pred, target)
-                scores.append(batch_scores)
-
-        mean_scores = {f"val_{metric}": sum([s[metric] for s in scores]) / len(scores) for metric in scores[0].keys()}
-        return mean_scores
+        preds, targets = self.predict(self.val_dataloader)
+        scores = self.score(preds, targets)
+        scores = {f"val_{metric}": value for metric, value in scores.items()}
+        self.log_scores(scores)
+        return scores
 
     def test(self):
+        preds, targets = self.predict(self.test_dataloader)
+        scores = self.score(preds, targets)
+        scores = {f"test_{metric}": value for metric, value in scores.items()}
+        self.log_scores(scores)
+        return scores
+
+    def predict(self, dataloader):
         self.model.eval()
-        scores = []
+
+        dataset = dataloader.dataset
+        pred_len = self.config.pred_len
+        step_size = dataset.step_size
+        dataset_len = ((dataset.n_points - pred_len) // step_size) + 1
+        n_points = pred_len + ((dataset_len - 1) * step_size)
+
+        n_classes = dataset.n_classes
+        bs = dataloader.batch_size
+
+        preds = torch.full((n_points, n_classes), float("nan"))
+        targets = torch.full((n_points,), -1, dtype=torch.int)
+
         with torch.no_grad():
-            for (x_enc, x_dec, target) in tqdm(self.test_dataloader):
+            for idx, (x_enc, x_dec, target) in tqdm(enumerate(dataloader), total=len(dataloader)):
                 x_enc = x_enc.to(self.device, self.dtype)
                 x_dec = x_dec.to(self.device, self.dtype)
-                target = target.to(self.device, self.dtype)
 
                 pred = self.model(x_enc, x_dec)
-                batch_scores = self.score(pred, target)
-                scores.append(batch_scores)
 
-        mean_scores = {f"test_{metric}": sum([s[metric] for s in scores]) / len(scores) for metric in scores[0].keys()}
-        return mean_scores
+                for j in range(pred.size(0)):
+                    inds = dataset.inverse_index((idx * bs) + j)
+                    time_idx = inds[0] if isinstance(inds, tuple) else inds
+                    time_idx = slice(time_idx, time_idx + pred.size(1))
+                    cls_idx = 1 if n_classes == 2 else slice(None)
+
+                    preds[time_idx, cls_idx] = pred[j].squeeze().cpu().detach()
+                    targets[time_idx] = target[j].squeeze().cpu().detach()
+
+        if n_classes == 2:
+            preds[:, 0] = 1 - preds[:, 1]
+
+        assert not torch.isnan(preds).any()
+        assert not (targets < 0).any()
+
+        return preds, targets
 
     def build_loss(self):
             match self.config.training.loss:
@@ -85,12 +106,12 @@ class SemanticSegmentationTask(BaseTask):
             return self.loss_fn
 
     def score(self, pred_scores, target):
-        pred = (pred_scores > 0.5).int().cpu().numpy().flatten()
-        target = target.int().cpu().numpy().flatten()
+        pred = pred_scores.argmax(dim=1).int().numpy()
+        target = target.numpy()
         return {
             "accuracy": accuracy_score(target, pred),
-            "f1": f1_score(target, pred, average="binary"),
-            "precision": precision_score(target, pred, average="binary"),
-            "recall": recall_score(target, pred, average="binary"),
-            "iou": jaccard_score(target, pred, average="binary"),
+            "f1": f1_score(target, pred, average="binary", zero_division=0),
+            "precision": precision_score(target, pred, average="binary", zero_division=0),
+            "recall": recall_score(target, pred, average="binary", zero_division=0),
+            "iou": jaccard_score(target, pred, average="binary", zero_division=0),
         }
