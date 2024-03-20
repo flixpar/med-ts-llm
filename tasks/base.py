@@ -6,8 +6,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
-
 from torch.utils.data import DataLoader
+
+import pytorch_optimizer
 
 import wandb
 
@@ -63,9 +64,17 @@ class BaseTask(ABC):
         return self.model
 
     def build_optimizer(self):
+        params = [p for p in self.model.parameters() if p.requires_grad]
         match self.config.training.optimizer:
             case "adam":
-                self.optimizer = optim.Adam(self.model.parameters(), lr=self.config.training.learning_rate)
+                self.optimizer = optim.Adam(params, lr=self.config.training.learning_rate)
+            case "adamw":
+                self.optimizer = optim.AdamW(params, lr=self.config.training.learning_rate, weight_decay=0.01)
+            case "sgd":
+                self.optimizer = optim.SGD(params, lr=self.config.training.learning_rate, momentum=0.9, nesterov=True)
+            case "ranger21" | "ranger":
+                num_iter = len(self.train_dataloader) * self.config.training.epochs
+                self.optimizer = pytorch_optimizer.Ranger21(params, num_iterations=num_iter, lr=self.config.training.learning_rate)
             case _:
                 raise ValueError(f"Invalid optimizer selection: {self.config.training.optimizer}")
         return self.optimizer
