@@ -15,8 +15,8 @@ import wandb
 
 from models import model_lookup
 from datasets import get_dataset
+from loggers import get_logger
 from utils import set_seed, dict_to_object
-from utils import get_logging_tags, summarize_config
 
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.allow_tf32 = True
@@ -46,7 +46,7 @@ class BaseTask(ABC):
         self.epoch = 1
         self.step = 0
 
-        self.log_start()
+        self.logger = get_logger(self, self.config, self.newrun)
 
     @abstractmethod
     def train(self):
@@ -93,7 +93,7 @@ class BaseTask(ABC):
             case "mae":
                 self.loss_fn = torch.nn.L1Loss()
             case _:
-                raise ValueError(f"Invalid loss function selection: {self.config.loss}")
+                raise ValueError(f"Invalid loss function selection: {self.config.training.loss}")
         return self.loss_fn
 
     def build_datasets(self):
@@ -123,58 +123,20 @@ class BaseTask(ABC):
             num_workers = num_workers,
         )
 
-    def log_start(self):
-        self.logdir = Path(__file__).parent / f"../outputs/logs/{self.run_id}/"
-        self.logdir.mkdir(parents=True, exist_ok=True)
-
-        if self.newrun:
-            config_dict = self.config.to_dict()
-            with open(self.logdir / "config.toml", "w") as f:
-                toml.dump(config_dict, f)
-            with open(self.logdir / "config.json", "w") as f:
-                json.dump(config_dict, f, indent="\t")
-
-        self.logger = wandb.init(
-            project = "med-time-llm",
-            entity = "med-time-llm",
-            name = self.run_id,
-            id = self.run_id,
-            dir = self.logdir,
-            config = summarize_config(self.config),
-            tags = get_logging_tags(self.config),
-            resume = "allow",
-            mode = "online" if not self.config.DEBUG else "disabled",
-        )
-
     def log_end(self):
-        self.logger.finish()
+        self.logger.log_end()
 
     def log_step(self, loss):
         self.step += self.config.training.batch_size
-        self.logger.log({
-            "epoch": self.epoch,
-            "step": self.step,
-            "train_loss": loss,
-        })
+        self.logger.log_scores(train_loss=loss)
 
     def log_epoch(self, scores={}, **kwscores):
-        self.logger.log({"epoch": self.epoch, "step": self.step} | scores | kwscores)
+        self.logger.log_scores(scores | kwscores)
         self.epoch += 1
-        self.save_state()
+        self.logger.save_state("latest")
 
     def log_scores(self, scores={}, **kwscores):
-        self.logger.log({"epoch": self.epoch, "step": self.step} | scores | kwscores)
-
-    def save_state(self):
-        modeldir = self.logdir / "checkpoints"
-        modeldir.mkdir(parents=True, exist_ok=True)
-
-        state = {
-            "epoch": self.epoch,
-            "step": self.step,
-            "model": self.model.state_dict(),
-        }
-        torch.save(state, modeldir / "latest.pt")
+        self.logger.log_scores(scores | kwscores)
 
     def get_device(self):
         match self.config.setup.device, torch.cuda.is_available():

@@ -37,3 +37,13 @@ def summarize_config(config):
     del config["models"]
 
     return config
+
+def flatten_dict(d, parent_key="", sep="."):
+    output = {}
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            output = output | flatten_dict(v, new_key, sep)
+        else:
+            output[new_key] = v
+    return output
