@@ -4,19 +4,28 @@ import toml
 from tasks import task_lookup
 
 
-def main(run_id):
+def main(run_id, split="test"):
     config = toml.load(f"outputs/logs/{run_id}/config.toml")
     task = config["task"]
 
     task_cls = task_lookup[task]
     trainer = task_cls.from_run_id(run_id)
 
-    test_scores = trainer.test()
+    if split == "test":
+        test_scores = trainer.test()
+    elif split == "val":
+        test_scores = trainer.val()
+    else:
+        raise ValueError(f"Invalid split selected for testing: {split}")
 
-    print("Test results:", test_scores)
+    print("Results:", test_scores)
     print("Run ID:", run_id)
 
 if __name__ == "__main__":
-    assert len(sys.argv) == 2
-    run_id = sys.argv[1]
-    main(run_id)
+    match sys.argv:
+        case [_, run_id]:
+            main(run_id)
+        case [_, run_id, split]:
+            main(run_id, split)
+        case _:
+            raise ValueError("Invalid number of arguments")
