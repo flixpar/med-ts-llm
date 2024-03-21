@@ -9,20 +9,20 @@ pred_len = 48
 
 [data]
 dataset = "ETTh1"
-mode = "univariate"
+mode = "multivariate"
 cols = "all"
-normalize = false
-step = 48
+normalize = true
+step = 24
 
 
 [training]
 epochs = 10
 batch_size = 16
-optimizer = "adam"
-learning_rate = 0.0001
+optimizer = "ranger"
+learning_rate = 0.001
 dropout = 0.1
-
 loss = "mse"
+eval_metric = "mse"
 
 
 [models.timellm]
@@ -39,7 +39,7 @@ stride = 8
 enabled = true
 llm = "state-spaces/mamba-1.4b-hf"
 load_in_4bit = false
-llm_layers = 4
+llm_layers = 36
 
 
 [models.gpt4ts]
@@ -60,5 +60,7 @@ individual = false
 
 [setup]
 seed = 0
-device = "cuda:0"
-num_workers = 8
+device = "auto"
+dtype = "bf16"
+num_workers = "auto"
+logger = "wandb"

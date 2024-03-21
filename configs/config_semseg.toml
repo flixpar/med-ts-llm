@@ -1,28 +1,28 @@
-DEBUG = true
+DEBUG = false
 
-task = "forecasting" # options: forecasting, anomaly_detection, imputation, classification
+task = "semantic_segmentation" # options: forecasting, anomaly_detection, imputation, classification
 model = "timellm"    # options: timellm, gpt4ts, dlinear
 
 history_len = 96
-pred_len = 48
+pred_len = 96
 
 
 [data]
-dataset = "ETTh1"
+dataset = "ventilator"
 mode = "multivariate"
 cols = "all"
 normalize = true
-step = 12
+step = 8
 
 
 [training]
-epochs = 2
+epochs = 10
 batch_size = 16
 optimizer = "ranger"
 learning_rate = 0.001
 dropout = 0.1
-loss = "mse"
-eval_metric = "mse"
+loss = "bce"
+eval_metric = "f1"
 
 
 [models.timellm]
@@ -36,10 +36,10 @@ patch_len = 16
 stride = 8
 
 [models.timellm.llm]
-enabled = false
+enabled = true
 llm = "state-spaces/mamba-1.4b-hf"
 load_in_4bit = false
-llm_layers = 4
+llm_layers = 36
 
 
 [models.gpt4ts]

@@ -1,7 +1,7 @@
 DEBUG = false
 
 task = "anomaly_detection" # options: forecasting, anomaly_detection, imputation, classification
-model = "timellm"    # options: timellm, dlinear
+model = "timellm"          # options: timellm, dlinear
 
 history_len = 96
 pred_len = 96
@@ -9,20 +9,20 @@ pred_len = 96
 
 [data]
 dataset = "PSM"
-mode = "univariate"
+mode = "multivariate"
 cols = "all"
-normalize = false
+normalize = true
 step = 48
 
 
 [training]
 epochs = 10
 batch_size = 16
-optimizer = "adam"
-learning_rate = 0.0001
+optimizer = "ranger"
+learning_rate = 0.001
 dropout = 0.1
-
 loss = "mse"
+eval_metric = "mse"
 
 
 [models.timellm]
@@ -36,10 +36,10 @@ patch_len = 16
 stride = 8
 
 [models.timellm.llm]
-enabled = false
+enabled = true
 llm = "state-spaces/mamba-1.4b-hf"
 load_in_4bit = false
-llm_layers = 4
+llm_layers = 36
 
 
 [models.gpt4ts]
@@ -60,5 +60,7 @@ individual = false
 
 [setup]
 seed = 0
-device = "cuda:0"
-num_workers = 8
+device = "auto"
+dtype = "bf16"
+num_workers = "auto"
+logger = "wandb"
