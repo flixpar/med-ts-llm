@@ -45,6 +45,7 @@ class BaseTask(ABC):
 
         self.epoch = 1
         self.step = 0
+        self.best_score = float("inf")
 
         self.logger = get_logger(self, self.config, self.newrun)
 
@@ -131,9 +132,15 @@ class BaseTask(ABC):
         self.logger.log_scores(train_loss=loss)
 
     def log_epoch(self, scores={}, **kwscores):
-        self.logger.log_scores(scores | kwscores)
+        scores = scores | kwscores
+        self.logger.log_scores(scores)
         self.epoch += 1
         self.logger.save_state("latest")
+
+        metric = "val_" + self.config.training.eval_metric
+        if scores[metric] < self.best_score:
+            self.best_score = scores[metric]
+            self.logger.save_state("best")
 
     def log_scores(self, scores={}, **kwscores):
         self.logger.log_scores(scores | kwscores)
