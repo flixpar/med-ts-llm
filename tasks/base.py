@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 import toml, json
+import os
 
 import torch
 import torch.nn as nn
@@ -16,6 +17,11 @@ from models import model_lookup
 from datasets import get_dataset
 from utils import set_seed, dict_to_object
 from utils import get_logging_tags, summarize_config
+
+torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.allow_tf32 = True
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.set_float32_matmul_precision("medium")
 
 
 class BaseTask(ABC):
@@ -96,23 +102,25 @@ class BaseTask(ABC):
         self.test_dataset = get_dataset(self.config, "test")
 
     def build_dataloaders(self):
+        num_workers = self.config.setup.num_workers
+        num_workers = os.cpu_count()//2 if num_workers == "auto" else num_workers
         self.train_dataloader = DataLoader(
             self.train_dataset,
             batch_size = self.config.training.batch_size,
             shuffle = True,
-            num_workers = self.config.setup.num_workers,
+            num_workers = num_workers,
         )
         self.val_dataloader = DataLoader(
             self.val_dataset,
             batch_size = self.config.training.batch_size,
             shuffle = False,
-            num_workers = self.config.setup.num_workers,
+            num_workers = num_workers,
         )
         self.test_dataloader = DataLoader(
             self.test_dataset,
             batch_size = self.config.training.batch_size,
             shuffle = False,
-            num_workers = self.config.setup.num_workers,
+            num_workers = num_workers,
         )
 
     def log_start(self):
@@ -169,10 +177,26 @@ class BaseTask(ABC):
         torch.save(state, modeldir / "latest.pt")
 
     def get_device(self):
-        return torch.device(self.config.setup.device)
+        match self.config.setup.device, torch.cuda.is_available():
+            case "auto", True:
+                return torch.device("cuda")
+            case "auto", False:
+                return torch.device("cpu")
+            case x, _:
+                return torch.device(x)
 
     def get_dtype(self):
-        return torch.float32 if self.config.setup.device == "cpu" else torch.bfloat16
+        match self.config.setup.dtype:
+            case "bfloat16" | "bf16":
+                return torch.bfloat16
+            case "float16" | "half" | "fp16" | "16" | 16:
+                return torch.float16
+            case "float32" | "float" | "fp32" | "32" | 32:
+                return torch.float32
+            case "mixed":
+                return torch.float32
+            case _:
+                raise ValueError(f"Invalid dtype selection: {self.config.setup.dtype}")
 
     @classmethod
     def from_run_id(cls, run_id):
