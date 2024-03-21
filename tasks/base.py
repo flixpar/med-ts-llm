@@ -15,6 +15,7 @@ import wandb
 from models import model_lookup
 from datasets import get_dataset
 from utils import set_seed, dict_to_object
+from utils import get_logging_tags, summarize_config
 
 
 class BaseTask(ABC):
@@ -127,10 +128,12 @@ class BaseTask(ABC):
 
         self.logger = wandb.init(
             project = "med-time-llm",
+            entity = "med-time-llm",
             name = self.run_id,
             id = self.run_id,
             dir = self.logdir,
-            config = self.config.__dict__,
+            config = summarize_config(self.config),
+            tags = get_logging_tags(self.config),
             resume = "allow",
             mode = "online" if not self.config.DEBUG else "disabled",
         )
