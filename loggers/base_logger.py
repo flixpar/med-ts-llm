@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 import toml, json
+from datetime import datetime
 import torch
 
 
@@ -25,8 +26,10 @@ class BaseLogger(ABC):
         modeldir.mkdir(parents=True, exist_ok=True)
 
         state = {
+            "run_id": self.trainer.run_id,
             "epoch": self.trainer.epoch,
             "step": self.trainer.step,
+            "datetime": datetime.now().isoformat(),
             "model": self.trainer.model.state_dict(),
         }
         torch.save(state, modeldir / f"{name}.pt")

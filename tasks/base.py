@@ -177,7 +177,9 @@ class BaseTask(ABC):
 
         modelpath = basepath / "checkpoints/latest.pt"
         state = torch.load(modelpath)
-        trainer.model.load_state_dict(state["model"])
+        _, unexpected = trainer.model.load_state_dict(state["model"], strict=False)
+        assert not unexpected, f"Unexpected keys in model state: {unexpected}"
+
         trainer.epoch = state["epoch"]
         trainer.step = state["step"]
 

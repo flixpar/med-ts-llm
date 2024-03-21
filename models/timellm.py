@@ -107,6 +107,16 @@ class TimeLLM(nn.Module):
             for param in self.llm.parameters():
                 param.requires_grad = False
 
+    def state_dict(self):
+        state_dict = super().state_dict()
+
+        if self.llm_enabled:
+            llm_keys = [k for k in state_dict.keys() if k[:4] == "llm."]
+            for k in llm_keys:
+                del state_dict[k]
+
+        return state_dict
+
     def forward(self, x_enc, x_dec):
         forecast_fn = self.forecast if self.llm_enabled else self.forecast_nollm
         if self.task in ["forecasting", "anomaly_detection"]:
