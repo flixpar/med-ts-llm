@@ -134,13 +134,14 @@ class BaseTask(ABC):
     def log_epoch(self, scores={}, **kwscores):
         scores = scores | kwscores
         self.logger.log_scores(scores)
-        self.epoch += 1
         self.logger.save_state("latest")
 
         metric = "val_" + self.config.training.eval_metric
         if scores[metric] < self.best_score:
             self.best_score = scores[metric]
             self.logger.save_state("best")
+
+        self.epoch += 1
 
     def log_scores(self, scores={}, **kwscores):
         self.logger.log_scores(scores | kwscores)

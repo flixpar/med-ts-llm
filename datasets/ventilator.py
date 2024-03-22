@@ -87,7 +87,7 @@ class VentilatorSemanticSegmentationDataset(VentilatorDataset):
         assert self.task == "semantic_segmentation"
         assert self.pred_len == self.history_len
 
-        basepath = Path(__file__).parent / "../data/ventilator/v2/"
+        basepath = Path(__file__).parent / "../data/ventilator/v3/"
         waveform_files = basepath.glob("*.csv")
         waveform_files = [fn for fn in waveform_files if fn.name != "patient_704_vent_w_1_labeled.csv"]
         waveform_files = sorted(waveform_files)

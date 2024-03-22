@@ -17,6 +17,7 @@ class WandBLogger(BaseLogger):
             config = summarize_config(self.config),
             tags = get_logging_tags(self.config),
             resume = "allow",
+            job_type = "training",
             mode = "online" if not self.config.DEBUG else "disabled",
         )
 
