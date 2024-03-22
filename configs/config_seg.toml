@@ -1,0 +1,71 @@
+DEBUG = false
+
+task = "segmentation" # options: forecasting, anomaly_detection, imputation, classification
+model = "dlinear"     # options: timellm, gpt4ts, dlinear
+
+history_len = 72
+pred_len = 72
+
+
+[data]
+dataset = "bidmc"
+mode = "multivariate"
+cols = "all"
+normalize = true
+step = 8
+
+
+[training]
+epochs = 10
+batch_size = 16
+optimizer = "ranger"
+learning_rate = 0.001
+dropout = 0.05
+loss = "bce"
+eval_metric = "segment_miou_neg"
+
+
+[tasks.segmentation]
+mode = "boundary-prediction"
+# mode = "steps-to-boundary"
+
+
+[models.timellm]
+d_model = 16
+n_heads = 8
+d_ff = 32
+num_tokens = 1000
+
+[models.timellm.patching]
+patch_len = 16
+stride = 8
+
+[models.timellm.llm]
+enabled = true
+llm = "state-spaces/mamba-1.4b-hf"
+load_in_4bit = false
+llm_layers = 36
+
+
+[models.gpt4ts]
+d_ff = 768
+d_model = 768
+gpt_layers = 6
+train_mlp = false
+
+[models.gpt4ts.patching]
+patch_len = 1
+stride = 1
+
+
+[models.dlinear]
+moving_avg = 25
+individual = false
+
+
+[setup]
+seed = 0
+device = "auto"
+dtype = "bf16"
+num_workers = "auto"
+logger = "wandb"

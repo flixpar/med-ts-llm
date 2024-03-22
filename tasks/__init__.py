@@ -1,11 +1,13 @@
 from .forecasting import ForecastTask
 from .anomaly_detection import AnomalyDetectionTask
+from .segmentation import SegmentationTask
 from .semantic_segmentation import SemanticSegmentationTask
 
 
 task_lookup = {
     "forecasting": ForecastTask,
     "anomaly_detection": AnomalyDetectionTask,
+    "segmentation": SegmentationTask,
     "semantic_segmentation": SemanticSegmentationTask,
 }
 
