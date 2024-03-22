@@ -8,7 +8,7 @@ class DLinear(nn.Module):
     Paper link: https://arxiv.org/pdf/2205.13504.pdf
     """
 
-    supported_tasks = ["forecasting", "anomaly_detection", "imputation", "classification"]
+    supported_tasks = ["forecasting", "anomaly_detection", "imputation", "classification", "semantic_segmentation", "segmentation"]
     supported_modes = ["multivariate"]
 
     def __init__(self, config, dataset):
@@ -21,7 +21,7 @@ class DLinear(nn.Module):
         self.decompsition = series_decomp(config.models.dlinear.moving_avg)
 
         self.seq_len = config.history_len
-        if self.task_name in ["classification", "anomaly_detection", "imputation"]:
+        if self.task_name in ["classification", "anomaly_detection", "imputation", "semantic_segmentation", "segmentation"]:
             self.pred_len = self.seq_len
         else:
             self.pred_len = config.pred_len
@@ -46,7 +46,13 @@ class DLinear(nn.Module):
         if self.task_name == "classification":
             self.act = F.gelu
             self.dropout = nn.Dropout(config.training.dropout)
-            self.projection = nn.Linear(config.enc_in * config.seq_len, dataset.n_classes)
+            self.projection = nn.Linear(self.channels * self.seq_len, dataset.n_classes)
+        elif self.task_name == "semantic_segmentation":
+            assert dataset.n_classes == 2, "Semantic segmentation currently only supports binary classification"
+            out_size = dataset.n_classes * self.pred_len if dataset.n_classes > 2 else self.pred_len
+            self.projection = nn.Linear(self.channels * self.seq_len, out_size)
+        elif self.task_name == "segmentation":
+            self.projection = nn.Linear(self.channels * self.seq_len, self.seq_len)
 
     def encoder(self, x):
         seasonal_init, trend_init = self.decompsition(x)
@@ -78,6 +84,22 @@ class DLinear(nn.Module):
         output = self.projection(output)  # (batch_size, num_classes)
         return output
 
+    def semantic_segmentation(self, x_enc):
+        enc_out = self.encoder(x_enc)
+        enc_out = F.gelu(enc_out)
+        output = enc_out.reshape(enc_out.shape[0], -1)
+        output = self.projection(output)
+        output = F.sigmoid(output)
+        return output
+
+    def segmentation(self, x_enc):
+        enc_out = self.encoder(x_enc)
+        enc_out = F.gelu(enc_out)
+        output = enc_out.reshape(enc_out.shape[0], -1)
+        output = self.projection(output)
+        output = F.sigmoid(output)
+        return output
+
     def forward(self, x_enc, x_dec):
         if self.task_name == "forecasting":
             dec_out = self.forecast(x_enc)
@@ -91,6 +113,12 @@ class DLinear(nn.Module):
         elif self.task_name == "classification":
             dec_out = self.classification(x_enc)
             return dec_out  # [B, N]
+        elif self.task_name == "semantic_segmentation":
+            dec_out = self.semantic_segmentation(x_enc)
+            return dec_out
+        elif self.task_name == "segmentation":
+            dec_out = self.segmentation(x_enc)
+            return dec_out
         else:
             raise ValueError(f"Invalid task name for DLinear: {self.task_name}")
 
