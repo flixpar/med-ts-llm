@@ -8,15 +8,15 @@ pred_len = 48
 
 
 [data]
-dataset = "ETTh1"
+dataset = "ECG"
 mode = "multivariate"
 cols = "all"
 normalize = true
-step = 12
+step = 24
 
 
 [training]
-epochs = 2
+epochs = 1
 batch_size = 16
 optimizer = "ranger"
 learning_rate = 0.001
@@ -30,6 +30,7 @@ d_model = 16
 n_heads = 8
 d_ff = 32
 num_tokens = 1000
+covariate_mode = "add"    # options: univariate, concat, add, interleave, independent
 
 [models.timellm.patching]
 patch_len = 16
@@ -39,7 +40,7 @@ stride = 8
 enabled = false
 llm = "state-spaces/mamba-1.4b-hf"
 load_in_4bit = false
-llm_layers = 4
+llm_layers = 2
 
 
 [models.gpt4ts]
@@ -62,5 +63,5 @@ individual = false
 seed = 0
 device = "auto"
 dtype = "bf16"
-num_workers = "auto"
-logger = "wandb"
+num_workers = 0
+logger = "tensorboard"

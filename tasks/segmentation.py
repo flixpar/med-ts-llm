@@ -98,7 +98,8 @@ class SegmentationTask(BaseTask):
         # pred_scores = smooth_scores(pred_scores, 25, "mean")
         # pred_points = find_peaks_threshold(pred_scores, 0.55)
 
-        pred_points = scipy.signal.find_peaks(pred_scores.numpy(), thresh_distance=300)[0]
+        distance_thresh = self.config.tasks.segmentation.distance_thresh
+        pred_points = scipy.signal.find_peaks(pred_scores.numpy(), distance=distance_thresh)[0]
         pred_points = torch.tensor(pred_points, dtype=torch.int)
 
         pred_labels = torch.zeros_like(targets)

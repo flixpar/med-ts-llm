@@ -1,7 +1,7 @@
 DEBUG = false
 
 task = "segmentation" # options: forecasting, anomaly_detection, imputation, classification
-model = "dlinear"     # options: timellm, gpt4ts, dlinear
+model = "timellm"     # options: timellm, gpt4ts, dlinear
 
 history_len = 72
 pred_len = 72
@@ -12,15 +12,15 @@ dataset = "bidmc"
 mode = "multivariate"
 cols = "all"
 normalize = true
-step = 8
+step = 36
 
 
 [training]
 epochs = 10
 batch_size = 16
 optimizer = "ranger"
-learning_rate = 0.001
-dropout = 0.05
+learning_rate = 1e-4
+dropout = 0.1
 loss = "bce"
 eval_metric = "segment_miou_neg"
 
@@ -28,6 +28,7 @@ eval_metric = "segment_miou_neg"
 [tasks.segmentation]
 mode = "boundary-prediction"
 # mode = "steps-to-boundary"
+distance_thresh = 300
 
 
 [models.timellm]
@@ -35,6 +36,7 @@ d_model = 16
 n_heads = 8
 d_ff = 32
 num_tokens = 1000
+covariate_mode = "add"    # options: univariate, concat, add, interleave, independent
 
 [models.timellm.patching]
 patch_len = 16
