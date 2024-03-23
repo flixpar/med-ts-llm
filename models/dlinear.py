@@ -26,6 +26,11 @@ class DLinear(nn.Module):
         else:
             self.pred_len = config.pred_len
 
+        if self.task_name in ["classification", "semantic_segmentation"]:
+            self.n_classes = dataset.n_classes
+        else:
+            self.n_classes = 0
+
         if self.individual:
             self.Linear_Seasonal = nn.ModuleList()
             self.Linear_Trend = nn.ModuleList()
@@ -48,8 +53,7 @@ class DLinear(nn.Module):
             self.dropout = nn.Dropout(config.training.dropout)
             self.projection = nn.Linear(self.channels * self.seq_len, dataset.n_classes)
         elif self.task_name == "semantic_segmentation":
-            assert dataset.n_classes == 2, "Semantic segmentation currently only supports binary classification"
-            out_size = dataset.n_classes * self.pred_len if dataset.n_classes > 2 else self.pred_len
+            out_size = self.pred_len * self.n_classes if self.n_classes > 2 else self.pred_len
             self.projection = nn.Linear(self.channels * self.seq_len, out_size)
         elif self.task_name == "segmentation":
             self.projection = nn.Linear(self.channels * self.seq_len, self.seq_len)
@@ -89,7 +93,12 @@ class DLinear(nn.Module):
         enc_out = F.gelu(enc_out)
         output = enc_out.reshape(enc_out.shape[0], -1)
         output = self.projection(output)
-        output = F.sigmoid(output)
+        if not self.training:
+            if self.n_classes > 2:
+                output = output.reshape(output.shape[0], self.pred_len, self.n_classes)
+                output = F.softmax(output, dim=-1)
+            else:
+                output = F.sigmoid(output)
         return output
 
     def segmentation(self, x_enc):
@@ -97,7 +106,8 @@ class DLinear(nn.Module):
         enc_out = F.gelu(enc_out)
         output = enc_out.reshape(enc_out.shape[0], -1)
         output = self.projection(output)
-        output = F.sigmoid(output)
+        if not self.training:
+            output = F.sigmoid(output)
         return output
 
     def forward(self, x_enc, x_dec):

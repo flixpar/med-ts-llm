@@ -47,13 +47,12 @@ class TimeLLM(nn.Module):
         self.covariate_mode = self.model_config.covariate_mode
         self.n_features = dataset.n_features
 
+        self.n_classes = dataset.n_classes if self.task in ["classification", "semantic_segmentation"] else 0
+
         if self.task in ["forecasting", "anomaly_detection"]:
             self.n_outputs_per_step = self.n_features
         elif self.task == "semantic_segmentation":
-            if dataset.n_classes == 2:
-                self.n_outputs_per_step = 1
-            else:
-                self.n_outputs_per_step = dataset.n_classes
+            self.n_outputs_per_step = self.n_classes if self.n_classes > 2 else 1
         elif self.task == "segmentation":
             self.n_outputs_per_step = 1
         else:
@@ -89,10 +88,6 @@ class TimeLLM(nn.Module):
                 nn.Linear(self.d_llm, self.d_ff),
                 nn.LayerNorm(self.d_ff),
             )
-
-        if self.task == "semantic_segmentation":
-            if dataset.n_classes != 2:
-                raise ValueError("TimeLLM only supports binary classification")
 
     def setup_llm(self):
         self.llm_enabled = self.model_config.llm.enabled
@@ -153,7 +148,10 @@ class TimeLLM(nn.Module):
             return self.forecast(x_enc, x_dec)
         elif self.task == "semantic_segmentation":
             pred = self.forecast(x_enc, x_dec)
-            pred = F.sigmoid(pred)
+            if self.n_classes > 2:
+                pred = F.softmax(pred, dim=-1)
+            else:
+                pred = F.sigmoid(pred)
             return pred
         elif self.task == "segmentation":
             if self.config.tasks.segmentation.mode == "boundary-prediction":

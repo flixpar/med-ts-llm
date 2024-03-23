@@ -57,7 +57,7 @@ class SegmentationTask(BaseTask):
     def build_loss(self):
         match self.config.training.loss:
             case "bce":
-                self.loss_fn = torch.nn.BCELoss()
+                self.loss_fn = torch.nn.BCEWithLogitsLoss()
             case _:
                 raise ValueError(f"Invalid loss function selection: {self.config.training.loss}")
         return self.loss_fn

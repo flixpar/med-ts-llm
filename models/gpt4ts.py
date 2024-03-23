@@ -203,10 +203,12 @@ class GPT4TS(nn.Module):
         dec_out = self.out_layer(dec_out)
         dec_out = dec_out.squeeze(-1)
 
-        if self.num_class > 2:
-            dec_out = torch.nn.functional.softmax(dec_out, dim=-1)
-        else:
-            dec_out = torch.sigmoid(dec_out)
+        if not self.training:
+            if self.num_class > 2:
+                dec_out = dec_out.reshape(B, self.pred_len, self.num_class)
+                dec_out = F.softmax(dec_out, dim=-1)
+            else:
+                dec_out = torch.sigmoid(dec_out)
 
         return dec_out
 
@@ -229,6 +231,7 @@ class GPT4TS(nn.Module):
         dec_out = self.out_layer(dec_out)
         dec_out = dec_out.squeeze(-1)
 
-        dec_out = torch.sigmoid(dec_out)
+        if not self.training:
+            dec_out = torch.sigmoid(dec_out)
 
         return dec_out

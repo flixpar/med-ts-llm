@@ -27,9 +27,11 @@ class SemanticSegmentationTask(BaseTask):
             for (x_enc, x_dec, target) in tqdm(self.train_dataloader):
                 x_enc = x_enc.to(self.device, self.dtype)
                 x_dec = x_dec.to(self.device, self.dtype)
-                target = target.to(self.device, self.dtype)
+                target = target.to(self.device)
 
                 pred = self.model(x_enc, x_dec)
+                if pred.ndim == 3:
+                    pred = pred.permute(0, 2, 1)
                 loss = self.loss_fn(pred, target)
 
                 loss.backward()
@@ -97,10 +99,14 @@ class SemanticSegmentationTask(BaseTask):
         return preds, targets
 
     def build_loss(self):
-            match self.config.training.loss:
-                case "bce":
-                    assert self.train_dataset.n_classes == 2
-                    self.loss_fn = torch.nn.BCELoss()
+            is_binary = (self.train_dataset.n_classes == 2)
+            match self.config.training.loss, is_binary:
+                case "bce", True:
+                    self.loss_fn = torch.nn.BCEWithLogitsLoss()
+                case ("ce", False) | ("cross_entropy", False):
+                    self.loss_fn = torch.nn.CrossEntropyLoss()
+                case ("ce", True) | ("cross_entropy", True):
+                    self.loss_fn = torch.nn.BCEWithLogitsLoss()
                 case _:
                     raise ValueError(f"Invalid loss function selection: {self.config.training.loss}")
             return self.loss_fn
@@ -110,8 +116,8 @@ class SemanticSegmentationTask(BaseTask):
         target = target.numpy()
         return {
             "accuracy": accuracy_score(target, pred),
-            "f1": f1_score(target, pred, average="binary", zero_division=0),
-            "precision": precision_score(target, pred, average="binary", zero_division=0),
-            "recall": recall_score(target, pred, average="binary", zero_division=0),
-            "iou": jaccard_score(target, pred, average="binary", zero_division=0),
+            "f1": f1_score(target, pred, zero_division=0),
+            "precision": precision_score(target, pred, zero_division=0),
+            "recall": recall_score(target, pred, zero_division=0),
+            "iou": jaccard_score(target, pred, zero_division=0),
         }
