@@ -9,14 +9,14 @@ from einops import rearrange
 
 class GPT4TS(nn.Module):
 
-    supported_tasks = ["forecasting", "imputation", "anomaly_detection", "classification"]
+    supported_tasks = ["forecasting", "imputation", "anomaly_detection", "classification", "semantic_segmentation", "segmentation"]
     supported_modes = ["multivariate", "univariate"]
 
     def __init__(self, config, dataset):
         super(GPT4TS, self).__init__()
         self.config = config
         self.model_config = self.config.models.gpt4ts
-        self.task_name = self.config.task
+        self.task = self.config.task
 
         self.d_ff = self.model_config.d_ff
         self.d_model = self.model_config.d_model
@@ -25,12 +25,12 @@ class GPT4TS(nn.Module):
 
         self.enc_in = dataset.n_features
         self.c_out = dataset.n_features
-        self.num_class = dataset.n_classes if self.task_name == "classification" else 0
+        self.num_class = dataset.n_classes if self.task in ["classification", "semantic_segmentation"] else 0
 
         self.pred_len = self.config.pred_len
         self.seq_len = self.config.history_len
 
-        self.patch_size = self.model_config.patching.patch_size
+        self.patch_size = self.model_config.patching.patch_len
         self.stride = self.model_config.patching.stride
         self.patch_num = (self.seq_len + self.pred_len - self.patch_size) // self.stride + 1
 
@@ -49,22 +49,30 @@ class GPT4TS(nn.Module):
             else:
                 param.requires_grad = False
 
-        if self.task_name == "forecasting":
+        if self.task == "forecasting":
             self.predict_linear_pre = nn.Linear(self.seq_len, self.pred_len + self.seq_len)
             self.predict_linear = nn.Linear(self.patch_size, self.enc_in)
             self.ln = nn.LayerNorm(self.d_ff)
             self.out_layer = nn.Linear(self.d_ff, self.c_out)
-        if self.task_name == "imputation":
+        if self.task == "imputation":
             self.ln_proj = nn.LayerNorm(self.d_model)
             self.out_layer = nn.Linear(self.d_model, self.c_out, bias=True)
-        if self.task_name == "anomaly_detection":
+        if self.task == "anomaly_detection":
             self.ln_proj = nn.LayerNorm(self.d_ff)
             self.out_layer = nn.Linear(self.d_ff, self.c_out, bias=True)
-        if self.task_name == "classification":
+        if self.task == "classification":
             self.act = F.gelu
             self.dropout = nn.Dropout(0.1)
             self.ln_proj = nn.LayerNorm(self.d_model * self.patch_num)
             self.out_layer = nn.Linear(self.d_model * self.patch_num, self.num_class)
+        if self.task == "semantic_segmentation":
+            self.ln_proj = nn.LayerNorm(self.d_ff)
+            n_output = self.num_class if self.num_class > 2 else 1
+            self.out_layer = nn.Linear(self.d_ff, n_output, bias=True)
+        if self.task == "segmentation":
+            assert self.config.tasks.segmentation.mode == "boundary-prediction"
+            self.ln_proj = nn.LayerNorm(self.d_ff)
+            self.out_layer = nn.Linear(self.d_ff, 1, bias=True)
 
     def forward(self, x_enc, x_dec=None, x_mark_enc=None, x_mark_dec=None, mask=None):
         if self.task == "forecasting":
@@ -75,6 +83,10 @@ class GPT4TS(nn.Module):
             return self.anomaly_detection(x_enc)
         elif self.task == "classification":
             return self.classification(x_enc, x_mark_enc)
+        elif self.task == "semantic_segmentation":
+            return self.semantic_segmentation(x_enc, x_mark_enc)
+        elif self.task == "segmentation":
+            return self.segmentation(x_enc, x_mark_enc)
         else:
             raise ValueError("Task name is not valid")
 
@@ -171,3 +183,52 @@ class GPT4TS(nn.Module):
         outputs = self.out_layer(outputs)
 
         return outputs
+
+    def semantic_segmentation(self, x_enc, x_mark_enc=None):
+        B, L, M = x_enc.shape
+
+        # Normalization from Non-stationary Transformer
+        means = x_enc.mean(1, keepdim=True).detach()
+        x_enc = x_enc - means
+        stdev = torch.sqrt(torch.var(x_enc, dim=1, keepdim=True, unbiased=False) + 1e-5)
+        x_enc /= stdev
+
+        # embedding
+        enc_out = self.enc_embedding(x_enc, x_mark_enc)  # [B,T,C]
+        enc_out = torch.nn.functional.pad(enc_out, (0, 768-enc_out.shape[-1]))
+
+        dec_out = self.gpt2(inputs_embeds=enc_out).last_hidden_state
+        dec_out = dec_out[:, :, :self.d_ff]
+
+        dec_out = self.out_layer(dec_out)
+        dec_out = dec_out.squeeze(-1)
+
+        if self.num_class > 2:
+            dec_out = torch.nn.functional.softmax(dec_out, dim=-1)
+        else:
+            dec_out = torch.sigmoid(dec_out)
+
+        return dec_out
+
+    def segmentation(self, x_enc, x_mark_enc=None):
+        B, L, M = x_enc.shape
+
+        # Normalization from Non-stationary Transformer
+        means = x_enc.mean(1, keepdim=True).detach()
+        x_enc = x_enc - means
+        stdev = torch.sqrt(torch.var(x_enc, dim=1, keepdim=True, unbiased=False) + 1e-5)
+        x_enc /= stdev
+
+        # embedding
+        enc_out = self.enc_embedding(x_enc, x_mark_enc)  # [B,T,C]
+        enc_out = torch.nn.functional.pad(enc_out, (0, 768-enc_out.shape[-1]))
+
+        dec_out = self.gpt2(inputs_embeds=enc_out).last_hidden_state
+        dec_out = dec_out[:, :, :self.d_ff]
+
+        dec_out = self.out_layer(dec_out)
+        dec_out = dec_out.squeeze(-1)
+
+        dec_out = torch.sigmoid(dec_out)
+
+        return dec_out
