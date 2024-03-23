@@ -22,7 +22,9 @@ optimizer = "ranger"
 learning_rate = 1e-4
 dropout = 0.1
 loss = "bce"
-eval_metric = "segment_miou_neg"
+
+eval_metric = "segment_miou"
+eval_metric_direction = "max"
 
 
 [tasks.segmentation]

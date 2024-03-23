@@ -137,7 +137,8 @@ class BaseTask(ABC):
         self.logger.save_state("latest")
 
         metric = "val_" + self.config.training.eval_metric
-        if scores[metric] < self.best_score:
+        metric_min = self.config.training.eval_metric_direction == "min"
+        if (metric_min and (scores[metric] < self.best_score)) or (not metric_min and (scores[metric] > self.best_score)):
             self.best_score = scores[metric]
             self.logger.save_state("best")
 

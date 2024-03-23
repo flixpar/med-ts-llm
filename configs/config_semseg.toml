@@ -22,7 +22,9 @@ optimizer = "ranger"
 learning_rate = 0.001
 dropout = 0.1
 loss = "bce"
+
 eval_metric = "f1"
+eval_metric_direction = "max"
 
 
 [models.timellm]

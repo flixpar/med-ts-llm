@@ -22,7 +22,15 @@ optimizer = "ranger"
 learning_rate = 0.001
 dropout = 0.1
 loss = "mse"
+
 eval_metric = "mse"
+eval_metric_direction = "min"
+
+
+[tasks.segmentation]
+mode = "boundary-prediction"
+# mode = "steps-to-boundary"
+distance_thresh = 300
 
 
 [models.timellm]
