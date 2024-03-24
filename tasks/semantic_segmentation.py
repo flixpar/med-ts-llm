@@ -108,12 +108,13 @@ class SemanticSegmentationTask(BaseTask):
             return self.loss_fn
 
     def score(self, pred_scores, target):
+        avg_mode = "binary" if pred_scores.size(1) == 2 else "macro"
         pred = pred_scores.argmax(dim=1).int().numpy()
         target = target.numpy()
         return {
             "accuracy": accuracy_score(target, pred),
-            "f1": f1_score(target, pred, zero_division=0),
-            "precision": precision_score(target, pred, zero_division=0),
-            "recall": recall_score(target, pred, zero_division=0),
-            "iou": jaccard_score(target, pred, zero_division=0),
+            "f1": f1_score(target, pred, average=avg_mode, zero_division=0),
+            "precision": precision_score(target, pred, average=avg_mode, zero_division=0),
+            "recall": recall_score(target, pred, average=avg_mode, zero_division=0),
+            "iou": jaccard_score(target, pred, average=avg_mode, zero_division=0),
         }
