@@ -46,14 +46,14 @@ class SemanticSegmentationTask(BaseTask):
     def val(self):
         preds, targets = self.predict(self.val_dataloader)
         scores = self.score(preds, targets)
-        scores = {f"val_{metric}": value for metric, value in scores.items()}
+        scores = {f"val/{metric}": value for metric, value in scores.items()}
         self.log_scores(scores)
         return scores
 
     def test(self):
         preds, targets = self.predict(self.test_dataloader)
         scores = self.score(preds, targets)
-        scores = {f"test_{metric}": value for metric, value in scores.items()}
+        scores = {f"test/{metric}": value for metric, value in scores.items()}
         self.log_scores(scores)
         return scores
 

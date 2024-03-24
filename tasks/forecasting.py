@@ -44,7 +44,7 @@ class ForecastTask(BaseTask):
                 batch_scores = self.score(pred, inputs["y"])
                 scores.append(batch_scores)
 
-        mean_scores = {f"val_{metric}": sum([s[metric] for s in scores]) / len(scores) for metric in scores[0].keys()}
+        mean_scores = {f"val/{metric}": sum([s[metric] for s in scores]) / len(scores) for metric in scores[0].keys()}
         return mean_scores
 
     def test(self):
@@ -58,7 +58,7 @@ class ForecastTask(BaseTask):
                 batch_scores = self.score(pred, inputs["y"])
                 scores.append(batch_scores)
 
-        mean_scores = {f"test_{metric}": sum([s[metric] for s in scores]) / len(scores) for metric in scores[0].keys()}
+        mean_scores = {f"test/{metric}": sum([s[metric] for s in scores]) / len(scores) for metric in scores[0].keys()}
         return mean_scores
 
     def score(self, pred, target):

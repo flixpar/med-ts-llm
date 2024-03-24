@@ -55,14 +55,14 @@ class AnomalyDetectionTask(BaseTask):
                 batch_scores = self.score(pred, inputs["x_enc"].detach())
                 scores.append(batch_scores)
 
-        mean_scores = {f"val_{metric}": sum([s[metric] for s in scores]) / len(scores) for metric in scores[0].keys()}
+        mean_scores = {f"val/{metric}": sum([s[metric] for s in scores]) / len(scores) for metric in scores[0].keys()}
         return mean_scores
 
     def test(self):
         results = self.predict(self.test_dataloader)
 
         scores = self.score_anomalies(results.anomaly_preds, results.anomaly_labels)
-        scores = {f"test_{metric}": value for metric, value in scores.items()}
+        scores = {f"test/{metric}": value for metric, value in scores.items()}
         self.log_scores(scores)
 
         return scores

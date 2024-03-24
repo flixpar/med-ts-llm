@@ -22,6 +22,11 @@ class WandBLogger(BaseLogger):
         )
 
     def log_end(self):
+        self.logger.log_code()
+
+        metrics = self.logger.history()
+        metrics.to_csv(self.logdir / "metrics.csv")
+
         self.logger.finish()
 
     def log_scores(self, scores={}, **kwscores):

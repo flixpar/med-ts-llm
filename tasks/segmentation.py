@@ -42,14 +42,14 @@ class SegmentationTask(BaseTask):
     def val(self):
         results = self.predict(self.val_dataloader)
         scores = self.score(results)
-        scores = {f"val_{metric}": value for metric, value in scores.items()}
+        scores = {f"val/{metric}": value for metric, value in scores.items()}
         self.log_scores(scores)
         return scores
 
     def test(self):
         results = self.predict(self.test_dataloader)
         scores = self.score(results)
-        scores = {f"test_{metric}": value for metric, value in scores.items()}
+        scores = {f"test/{metric}": value for metric, value in scores.items()}
         self.log_scores(scores)
         return scores
 
