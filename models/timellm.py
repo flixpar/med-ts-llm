@@ -144,39 +144,31 @@ class TimeLLM(nn.Module):
         return state_dict
 
     def forward(self, inputs):
-        x_enc = inputs["x_enc"]
-        x_dec = inputs.get("x_dec", None)
-        if self.task in ["forecasting", "anomaly_detection"]:
-            return self.forecast(x_enc, x_dec)
-        elif self.task == "semantic_segmentation":
-            pred = self.forecast(x_enc, x_dec)
+        pred = self.predict(inputs)
+
+        if self.task == "semantic_segmentation":
             if self.n_classes > 2:
                 pred = F.softmax(pred, dim=-1)
             else:
                 pred = F.sigmoid(pred)
-            return pred
         elif self.task == "segmentation":
             if self.config.tasks.segmentation.mode == "boundary-prediction":
-                pred = self.forecast(x_enc, x_dec)
                 pred = F.sigmoid(pred)
-                return pred
             elif self.config.tasks.segmentation.mode == "steps-to-boundary":
                 raise NotImplementedError("Steps-to-boundary segmentation not yet implemented for TimeLLM")
             else:
                 raise ValueError(f"Segmentation mode {self.config.tasks.segmentation.mode} not implemented for TimeLLM")
-        else:
-            raise ValueError(f"Task {self.task_name} not implemented")
 
-    def forecast(self, x_enc, x_dec=None):
+        return pred
+
+    def predict(self, inputs):
+        x_enc = inputs["x_enc"]
 
         if x_enc.ndim == 2:
             x_enc = x_enc.unsqueeze(-1)
 
         bs, seq_len, n_features = x_enc.size()
         assert n_features == self.n_features
-
-        if self.llm_enabled:
-            prompt = self.build_prompt(x_enc)
 
         x_enc = self.normalize_layers(x_enc, "norm")
 
@@ -200,6 +192,7 @@ class TimeLLM(nn.Module):
             enc_out = enc_out.reshape(bs, -1, self.d_llm)             # [bs, n_patches * n_features, d_llm]
 
         if self.llm_enabled:
+            prompt = self.build_prompt(inputs)
             prompt = self.tokenizer(prompt, return_tensors="pt", padding=True, truncation=True, max_length=2048).input_ids
             prompt_embeddings = self.llm.get_input_embeddings()(prompt.to(x_enc.device)) # [bs, n_tok, d_llm]
 
@@ -222,13 +215,18 @@ class TimeLLM(nn.Module):
 
         return dec_out
 
-    def build_prompt(self, x_enc):
+    def build_prompt(self, inputs):
+        x_enc = inputs["x_enc"]
+        if x_enc.ndim == 2:
+            x_enc = x_enc.unsqueeze(-1)
+
         with torch.no_grad():
             min_values = torch.min(x_enc, dim=1).values
             max_values = torch.max(x_enc, dim=1).values
             medians = torch.median(x_enc.float(), dim=1).values
             lags = calcute_lags(x_enc.float(), self.n_lags)
             trends = x_enc.diff(dim=1).sum(dim=1)
+            descriptions = inputs.get("descriptions")
 
         prompts = []
         for b in range(x_enc.size(0)):
@@ -240,6 +238,7 @@ class TimeLLM(nn.Module):
             prompt = (
                 f"<|start_prompt|>"
                 f"Dataset description: {self.dataset_description} "
+                f"{descriptions[b]} " if descriptions is not None else ""
                 f"Task description: {self.task_description} "
                 f"Input statistics: "
                 f"min value = {min_value:.3f}, "

@@ -29,8 +29,13 @@ class LUDBDataset(Dataset, ABC):
         split_fn = "train.csv" if split == "train" else "test.csv"
         data = pd.read_csv(basepath / split_fn)
 
+        desc_fn = "train_data_desc.csv" if split == "train" else "test_data_desc.csv"
+        descriptions = pd.read_csv(basepath / desc_fn, index_col=0)
+        self.descriptions = descriptions["data_desc"].to_dict()
+
         self.data = data["ecg"].values[:,np.newaxis]
         self.labels = data["label"].values.astype(int)
+        self.patient_ids = data["patient_id"].values.astype(int)
 
         if config.data.normalize:
             train_data = self.data if split == "train" else pd.read_csv(basepath / "train.csv", usecols=["ecg"]).values
@@ -79,7 +84,10 @@ class LUDBSemanticSegmentationDataset(LUDBDataset):
         x = self.data[slice(*idx_range),:]
         y = self.labels[slice(*idx_range)]
 
-        return {"x_enc": x, "labels": y}
+        patient_id = self.patient_ids[idx]
+        desc = self.descriptions[patient_id]
+
+        return {"x_enc": x, "labels": y, "descriptions": f"Patient description: {desc}"}
 
     def __len__(self):
         return (self.n_points - self.pred_len) // self.step_size + 1
