@@ -53,9 +53,7 @@ class ECGMITForecastingDataset(ECGMITDataset):
         x = self.data[slice(*x_range),:]
         y = self.data[slice(*y_range),:]
 
-        x_dec = x[0:0,:]
-
-        return x, x_dec, y
+        return {"x_enc": x, "y": y}
 
     def __len__(self):
         return (self.n_points - self.history_len - self.pred_len + 1) // self.step_size
@@ -82,14 +80,12 @@ class ECGMITAnomalyDetectionDataset(ECGMITDataset):
         x_range = (idx, idx + self.pred_len)
         x = self.data[slice(*x_range),:]
 
-        x_dec = x[0:0,:]
-
         if self.labels is not None:
             labels = self.labels[slice(*x_range)]
         else:
             labels = x[0:0,0]
 
-        return x, x_dec, labels
+        return {"x_enc": x, "labels": labels}
 
     def __len__(self):
         return (self.n_points - self.pred_len) // self.step_size + 1

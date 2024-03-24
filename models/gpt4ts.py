@@ -74,7 +74,13 @@ class GPT4TS(nn.Module):
             self.ln_proj = nn.LayerNorm(self.d_ff)
             self.out_layer = nn.Linear(self.d_ff, 1, bias=True)
 
-    def forward(self, x_enc, x_dec=None, x_mark_enc=None, x_mark_dec=None, mask=None):
+    def forward(self, inputs):
+        x_enc = inputs["x_enc"]
+        x_dec = inputs.get("x_dec", None)
+        x_mark_enc = inputs.get("x_mark_enc", None)
+        x_mark_dec = inputs.get("x_mark_dec", None)
+        mask = inputs.get("mask", None)
+
         if self.task == "forecasting":
             return self.forecast(x_enc, x_mark_enc, x_dec, x_mark_dec)[:, -self.pred_len:, :]
         elif self.task == "imputation":

@@ -24,15 +24,13 @@ class SemanticSegmentationTask(BaseTask):
         for epoch in range(self.config.training.epochs):
             print(f"Epoch {epoch + 1}/{self.config.training.epochs}")
             self.model.train()
-            for (x_enc, x_dec, target) in tqdm(self.train_dataloader):
-                x_enc = x_enc.to(self.device, self.dtype)
-                x_dec = x_dec.to(self.device, self.dtype)
-                target = target.to(self.device)
+            for inputs in tqdm(self.train_dataloader):
+                inputs = self.prepare_batch(inputs)
 
-                pred = self.model(x_enc, x_dec)
+                pred = self.model(inputs)
                 if pred.ndim == 3:
                     pred = pred.permute(0, 2, 1)
-                loss = self.loss_fn(pred, target)
+                loss = self.loss_fn(pred, inputs["labels"])
 
                 loss.backward()
                 self.optimizer.step()
@@ -75,11 +73,9 @@ class SemanticSegmentationTask(BaseTask):
         targets = torch.full((n_points,), -1, dtype=torch.int)
 
         with torch.no_grad():
-            for idx, (x_enc, x_dec, target) in tqdm(enumerate(dataloader), total=len(dataloader)):
-                x_enc = x_enc.to(self.device, self.dtype)
-                x_dec = x_dec.to(self.device, self.dtype)
-
-                pred = self.model(x_enc, x_dec)
+            for idx, inputs in tqdm(enumerate(dataloader), total=len(dataloader)):
+                inputs = self.prepare_batch(inputs)
+                pred = self.model(inputs)
 
                 for j in range(pred.size(0)):
                     inds = dataset.inverse_index((idx * bs) + j)
@@ -88,7 +84,7 @@ class SemanticSegmentationTask(BaseTask):
                     cls_idx = 1 if n_classes == 2 else slice(None)
 
                     preds[time_idx, cls_idx] = pred[j].squeeze().cpu().detach()
-                    targets[time_idx] = target[j].squeeze().cpu().detach()
+                    targets[time_idx] = inputs["labels"][j].squeeze().cpu().detach()
 
         if n_classes == 2:
             preds[:, 0] = 1 - preds[:, 1]

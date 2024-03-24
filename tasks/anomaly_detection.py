@@ -27,12 +27,11 @@ class AnomalyDetectionTask(BaseTask):
         for epoch in range(self.config.training.epochs):
             print(f"Epoch {epoch + 1}/{self.config.training.epochs}")
             self.model.train()
-            for (x_enc, x_dec, _) in tqdm(self.train_dataloader):
-                x_enc = x_enc.to(self.device, self.dtype)
-                x_dec = x_dec.to(self.device, self.dtype)
+            for inputs in tqdm(self.train_dataloader):
+                inputs = self.prepare_batch(inputs)
 
-                pred = self.model(x_enc, x_dec)
-                loss = self.loss_fn(pred, x_enc.detach())
+                pred = self.model(inputs)
+                loss = self.loss_fn(pred, inputs["x_enc"].detach())
 
                 loss.backward()
                 self.optimizer.step()
@@ -49,13 +48,11 @@ class AnomalyDetectionTask(BaseTask):
         self.model.eval()
         scores = []
         with torch.no_grad():
-            for (x_enc, x_dec, label) in tqdm(self.val_dataloader):
-                x_enc = x_enc.to(self.device, self.dtype)
-                x_dec = x_dec.to(self.device, self.dtype)
-                label = label.to(self.device, self.dtype)
+            for inputs in tqdm(self.val_dataloader):
+                inputs = self.prepare_batch(inputs)
 
-                pred = self.model(x_enc, x_dec)
-                batch_scores = self.score(pred, x_enc.detach())
+                pred = self.model(inputs)
+                batch_scores = self.score(pred, inputs["x_enc"].detach())
                 scores.append(batch_scores)
 
         mean_scores = {f"val_{metric}": sum([s[metric] for s in scores]) / len(scores) for metric in scores[0].keys()}
@@ -87,11 +84,9 @@ class AnomalyDetectionTask(BaseTask):
         labels = torch.full((n_points,), -1, dtype=torch.int)
 
         with torch.no_grad():
-            for idx, (x_enc, x_dec, label) in tqdm(enumerate(dataloader), total=len(dataloader)):
-                x_enc = x_enc.to(self.device, self.dtype)
-                x_dec = x_dec.to(self.device, self.dtype)
-
-                pred = self.model(x_enc, x_dec)
+            for idx, inputs in tqdm(enumerate(dataloader), total=len(dataloader)):
+                inputs = self.prepare_batch(inputs)
+                pred = self.model(inputs)
 
                 for j in range(pred.size(0)):
                     inds = dataset.inverse_index((idx * bs) + j)
@@ -99,8 +94,8 @@ class AnomalyDetectionTask(BaseTask):
                     time_idx = slice(time_idx, time_idx + pred.size(1))
 
                     preds[time_idx, feature_idx] = pred[j].squeeze().cpu().detach()
-                    targets[time_idx, feature_idx] = x_enc[j].squeeze().cpu().detach()
-                    labels[time_idx] = label[j].squeeze().cpu().detach()
+                    targets[time_idx, feature_idx] = inputs["x_enc"][j].squeeze().cpu().detach()
+                    labels[time_idx] = inputs["labels"][j].squeeze().cpu().detach()
 
         assert not torch.isnan(preds).any()
         assert not torch.isnan(targets).any()

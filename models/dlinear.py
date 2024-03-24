@@ -110,7 +110,8 @@ class DLinear(nn.Module):
             output = F.sigmoid(output)
         return output
 
-    def forward(self, x_enc, x_dec):
+    def forward(self, inputs):
+        x_enc = inputs["x_enc"]
         if self.task_name == "forecasting":
             dec_out = self.forecast(x_enc)
             return dec_out[:, -self.pred_len:, :]  # [B, L, D]

@@ -62,9 +62,7 @@ class ETTDataset(Dataset):
         x = self.data[slice(*x_range),:]
         y = self.data[slice(*y_range),:]
 
-        x_dec = x[0:0,:]
-
-        return x, x_dec, y
+        return {"x_enc": x, "y": y}
 
     def inverse_index(self, idx):
         return idx * self.step_size + self.history_len

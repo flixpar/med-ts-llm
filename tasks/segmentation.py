@@ -23,11 +23,10 @@ class SegmentationTask(BaseTask):
             print(f"Epoch {epoch + 1}/{self.config.training.epochs}")
             self.model.train()
             for inputs in tqdm(self.train_dataloader):
-                x_enc = inputs["x_enc"].to(self.device, self.dtype)
-                labels = inputs["labels"].to(self.device, self.dtype)
+                inputs = self.prepare_batch(inputs)
 
-                pred = self.model(x_enc, None)
-                loss = self.loss_fn(pred, labels)
+                pred = self.model(inputs)
+                loss = self.loss_fn(pred, inputs["labels"])
 
                 loss.backward()
                 self.optimizer.step()
@@ -77,10 +76,8 @@ class SegmentationTask(BaseTask):
 
         with torch.no_grad():
             for idx, inputs in tqdm(enumerate(dataloader), total=len(dataloader)):
-                x_enc = inputs["x_enc"].to(self.device, self.dtype)
-                label = inputs["labels"]
-
-                pred = self.model(x_enc, None)
+                inputs = self.prepare_batch(inputs)
+                pred = self.model(inputs)
 
                 for j in range(pred.size(0)):
                     inds = dataset.inverse_index((idx * bs) + j)
@@ -88,7 +85,7 @@ class SegmentationTask(BaseTask):
                     time_idx = slice(time_idx, time_idx + pred.size(1))
 
                     preds[time_idx] = pred[j].squeeze().cpu().detach()
-                    targets[time_idx] = label[j].squeeze().cpu().detach()
+                    targets[time_idx] = inputs["labels"][j].squeeze().cpu().detach()
 
         assert not torch.isnan(preds).any()
         assert not (targets < 0).any()

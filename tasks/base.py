@@ -124,6 +124,15 @@ class BaseTask(ABC):
             num_workers = num_workers,
         )
 
+    def prepare_batch(self, batch):
+        for k, v in batch.items():
+            if isinstance(v, torch.Tensor):
+                v = v.to(self.device)
+                if v.dtype.is_floating_point:
+                    v = v.to(self.dtype)
+                batch[k] = v
+        return batch
+
     def log_end(self):
         self.logger.log_end()
 

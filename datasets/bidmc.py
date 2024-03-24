@@ -62,9 +62,7 @@ class BIDMCForecastingDataset(BIDMCDataset):
         x = self.data[slice(*x_range),:]
         y = self.data[slice(*y_range),:]
 
-        x_dec = x[0:0,:]
-
-        return x, x_dec, y
+        return {"x_enc": x, "y": y}
 
     def __len__(self):
         return (self.n_points - self.history_len - self.pred_len + 1) // self.step_size

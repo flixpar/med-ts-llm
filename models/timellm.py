@@ -143,7 +143,9 @@ class TimeLLM(nn.Module):
 
         return state_dict
 
-    def forward(self, x_enc, x_dec):
+    def forward(self, inputs):
+        x_enc = inputs["x_enc"]
+        x_dec = inputs.get("x_dec", None)
         if self.task in ["forecasting", "anomaly_detection"]:
             return self.forecast(x_enc, x_dec)
         elif self.task == "semantic_segmentation":

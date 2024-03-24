@@ -16,13 +16,11 @@ class ForecastTask(BaseTask):
         for epoch in range(self.config.training.epochs):
             print(f"Epoch {epoch + 1}/{self.config.training.epochs}")
             self.model.train()
-            for (x_enc, x_dec, target) in tqdm(self.train_dataloader):
-                x_enc = x_enc.to(self.device, self.dtype)
-                x_dec = x_dec.to(self.device, self.dtype)
-                target = target.to(self.device, self.dtype)
+            for inputs in tqdm(self.train_dataloader):
+                inputs = self.prepare_batch(inputs)
 
-                pred = self.model(x_enc, x_dec)
-                loss = self.loss_fn(pred, target)
+                pred = self.model(inputs)
+                loss = self.loss_fn(pred, inputs["y"])
 
                 loss.backward()
                 self.optimizer.step()
@@ -39,13 +37,11 @@ class ForecastTask(BaseTask):
         self.model.eval()
         scores = []
         with torch.no_grad():
-            for (x_enc, x_dec, target) in tqdm(self.val_dataloader):
-                x_enc = x_enc.to(self.device, self.dtype)
-                x_dec = x_dec.to(self.device, self.dtype)
-                target = target.to(self.device, self.dtype)
+            for inputs in tqdm(self.val_dataloader):
+                inputs = self.prepare_batch(inputs)
 
-                pred = self.model(x_enc, x_dec)
-                batch_scores = self.score(pred, target)
+                pred = self.model(inputs)
+                batch_scores = self.score(pred, inputs["y"])
                 scores.append(batch_scores)
 
         mean_scores = {f"val_{metric}": sum([s[metric] for s in scores]) / len(scores) for metric in scores[0].keys()}
@@ -55,13 +51,11 @@ class ForecastTask(BaseTask):
         self.model.eval()
         scores = []
         with torch.no_grad():
-            for (x_enc, x_dec, target) in tqdm(self.test_dataloader):
-                x_enc = x_enc.to(self.device, self.dtype)
-                x_dec = x_dec.to(self.device, self.dtype)
-                target = target.to(self.device, self.dtype)
+            for inputs in tqdm(self.test_dataloader):
+                inputs = self.prepare_batch(inputs)
 
-                pred = self.model(x_enc, x_dec)
-                batch_scores = self.score(pred, target)
+                pred = self.model(inputs)
+                batch_scores = self.score(pred, inputs["y"])
                 scores.append(batch_scores)
 
         mean_scores = {f"test_{metric}": sum([s[metric] for s in scores]) / len(scores) for metric in scores[0].keys()}

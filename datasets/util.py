@@ -13,17 +13,18 @@ class Multi2UniDataset(Dataset):
         feature_idx = index % self.real_features
 
         if self.task == "forecasting":
-            x_enc, x_dec, y = self.dataset[example_idx]
-            x_enc, y = x_enc[:, feature_idx], y[:, feature_idx]
-            return x_enc, x_dec, y
-        elif self.task == "anomaly_detection":
-            x_enc, x_dec, label = self.dataset[example_idx]
-            x_enc = x_enc[:, feature_idx]
-            return x_enc, x_dec, label
-        elif self.task == "semantic_segmentation":
-            x, x_dec, y = self.dataset[example_idx]
-            x = x[:, feature_idx]
-            return x, x_dec, y
+            inputs = self.dataset[example_idx]
+            inputs["x_enc"] = inputs["x_enc"][:, feature_idx]
+            inputs["y"] = inputs["y"][:, feature_idx]
+            if "x_dec" in inputs:
+                inputs["x_dec"] = inputs["x_dec"][:, feature_idx]
+            return inputs
+        elif self.task in ["anomaly_detection", "semantic_segmentation", "segmentation"]:
+            inputs = self.dataset[example_idx]
+            inputs["x_enc"] = inputs["x_enc"][:, feature_idx]
+            if "x_dec" in inputs:
+                inputs["x_dec"] = inputs["x_dec"][:, feature_idx]
+            return inputs
         else:
             raise ValueError(f"Task {self.task} not supported by Multi2UniDataset")
 
