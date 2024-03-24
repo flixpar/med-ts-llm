@@ -66,3 +66,15 @@ class ForecastTask(BaseTask):
             "mse": F.mse_loss(pred, target).item(),
             "mae": F.l1_loss(pred, target).item(),
         }
+
+    def build_loss(self):
+        match self.config.training.loss:
+            case "mse":
+                self.loss_fn = torch.nn.MSELoss()
+            case "mae":
+                self.loss_fn = torch.nn.L1Loss()
+            case "smooth_l1" | "smooth_mae":
+                self.loss_fn = torch.nn.SmoothL1Loss()
+            case _:
+                raise ValueError(f"Invalid loss function selection: {self.config.training.loss}")
+        return self.loss_fn

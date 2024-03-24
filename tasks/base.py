@@ -65,6 +65,14 @@ class BaseTask(ABC):
     def score(self, pred, target):
         pass
 
+    @abstractmethod
+    def build_loss(self):
+        pass
+
+    @abstractmethod
+    def predict(self, dataloader):
+        pass
+
     def build_model(self):
         model_cls = model_lookup[self.config.model]
         self.model = model_cls(self.config, self.train_dataset)
@@ -86,16 +94,6 @@ class BaseTask(ABC):
             case _:
                 raise ValueError(f"Invalid optimizer selection: {self.config.training.optimizer}")
         return self.optimizer
-
-    def build_loss(self):
-        match self.config.training.loss:
-            case "mse":
-                self.loss_fn = torch.nn.MSELoss()
-            case "mae":
-                self.loss_fn = torch.nn.L1Loss()
-            case _:
-                raise ValueError(f"Invalid loss function selection: {self.config.training.loss}")
-        return self.loss_fn
 
     def build_datasets(self):
         self.train_dataset = get_dataset(self.config, "train")

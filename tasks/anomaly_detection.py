@@ -136,6 +136,18 @@ class AnomalyDetectionTask(BaseTask):
             "iou": jaccard_score(target, pred, average="binary", zero_division=0),
         }
 
+    def build_loss(self):
+        match self.config.training.loss:
+            case "mse":
+                self.loss_fn = torch.nn.MSELoss()
+            case "mae":
+                self.loss_fn = torch.nn.L1Loss()
+            case "smooth_l1" | "smooth_mae":
+                self.loss_fn = torch.nn.SmoothL1Loss()
+            case _:
+                raise ValueError(f"Invalid loss function selection: {self.config.training.loss}")
+        return self.loss_fn
+
 def adjust_anomalies(pred, gt):
     pred = pred.clone()
     anomaly_state = False
