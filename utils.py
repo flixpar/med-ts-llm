@@ -19,6 +19,8 @@ class dict_to_object(object):
         self.__dict__ = {k: dict_to_object(v) if isinstance(v, dict) else v for k, v in d.items()}
     def to_dict(self):
         return {k: v.to_dict() if isinstance(v, dict_to_object) else v for k, v in self.__dict__.items()}
+    def get(self, key, default=None):
+        return self.__dict__.get(key, default)
 
 def get_logging_tags(config):
     tags = [

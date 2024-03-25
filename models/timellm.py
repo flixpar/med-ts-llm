@@ -94,8 +94,13 @@ class TimeLLM(nn.Module):
         self.llm_id = self.model_config.llm.llm
         self.llm_layers = self.model_config.llm.llm_layers
 
+        cache_dir = self.config.get("paths", {}).get("llm_path")
+        if cache_dir == "" or cache_dir == "none":
+            cache_dir = None
+
         llm_config = AutoConfig.from_pretrained(
             self.llm_id,
+            cache_dir = cache_dir,
             trust_remote_code = True,
         )
         if self.llm_layers > 0:
@@ -106,11 +111,13 @@ class TimeLLM(nn.Module):
             self.llm_id,
             config = llm_config,
             load_in_4bit = self.model_config.llm.load_in_4bit,
+            cache_dir = cache_dir,
             trust_remote_code = True,
         )
 
         tokenizer = AutoTokenizer.from_pretrained(
             self.llm_id,
+            cache_dir = cache_dir,
             trust_remote_code = True,
         )
 
