@@ -20,7 +20,7 @@ class ECGMITDataset(Dataset, ABC):
         if self.split == "test":
             self.step_size = self.pred_len
 
-        basepath = Path(__file__).parent / "../data/mit_ecg/"
+        basepath = Path(__file__).parent / "../data/mit_ecg/anom/"
         split_fn = "train.csv" if split == "train" else "test.csv"
         data = pd.read_csv(basepath / split_fn)
         data = data.drop(columns=["time", "patient_id"])
@@ -36,7 +36,7 @@ class ECGMITDataset(Dataset, ABC):
 
         self.description = "The MIT-BIH Arrhythmia Database contains excerpts of two-channel ambulatory ECG from a mixed population of inpatients and outpatients, digitized at 360 samples per second per channel with 11-bit resolution over a 10 mV range."
 
-        self.supported_tasks = ["forecasting", "anomaly_detection"]
+        self.supported_tasks = ["forecasting", "anomaly_detection", "segmentation"]
         assert self.task in self.supported_tasks
 
 
@@ -57,7 +57,7 @@ class ECGMITForecastingDataset(ECGMITDataset):
 
     def __len__(self):
         return (self.n_points - self.history_len - self.pred_len + 1) // self.step_size
-    
+
     def inverse_index(self, idx):
         return idx * self.step_size + self.history_len
 
@@ -94,10 +94,54 @@ class ECGMITAnomalyDetectionDataset(ECGMITDataset):
         return idx * self.step_size
 
 
+class ECGMITSegmentationDataset(ECGMITDataset):
+    def __init__(self, config, split):
+        super(ECGMITSegmentationDataset, self).__init__(config, split)
+        assert self.task == "segmentation"
+
+        basepath = Path(__file__).parent / "../data/mit_ecg/seg/"
+        split_fn = "train.csv" if split == "train" else "test.csv"
+        data = pd.read_csv(basepath / split_fn)
+
+        time_col = "time"
+        clip_col = "patient_id"
+        label_col = "label"
+        feature_cols = data.columns.difference([time_col, clip_col, label_col])
+
+        self.data = data[feature_cols].values
+        self.labels = data[label_col].values.astype(int)
+        self.clip_ids = data[clip_col].values.astype(int)
+        self.timestamps = data[time_col].values
+
+        if config.data.normalize:
+            train_data = pd.read_csv(basepath / "train.csv")[feature_cols].values
+            self.normalizer = StandardScaler().fit(train_data)
+            self.data = self.normalizer.transform(self.data)
+
+        self.n_points, self.n_features = self.data.shape
+
+    def __getitem__(self, idx):
+        idx = idx * self.step_size
+        idx_range = (idx, idx + self.pred_len)
+
+        x = self.data[slice(*idx_range),:]
+        y = self.labels[slice(*idx_range)]
+
+        return {"x_enc": x, "labels": y}
+
+    def __len__(self):
+        return (self.n_points - self.pred_len) // self.step_size + 1
+
+    def inverse_index(self, idx):
+        return idx * self.step_size
+
+
 def ECGMITDatasetSelector(config, split):
     if config.task == "forecasting":
         return ECGMITForecastingDataset(config, split)
     elif config.task == "anomaly_detection":
         return ECGMITAnomalyDetectionDataset(config, split)
+    elif config.task == "segmentation":
+        return ECGMITSegmentationDataset(config, split)
     else:
         raise ValueError(f"Task {config.task} not supported by dataset {config.data.dataset}")
