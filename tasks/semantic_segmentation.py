@@ -30,7 +30,10 @@ class SemanticSegmentationTask(BaseTask):
                 pred = self.model(inputs)
                 if pred.ndim == 3:
                     pred = pred.permute(0, 2, 1)
-                loss = self.loss_fn(pred, inputs["labels"])
+                    labels = inputs["labels"]
+                else:
+                    labels = inputs["labels"].to(torch.dtype)
+                loss = self.loss_fn(pred, labels)
 
                 loss.backward()
                 self.optimizer.step()

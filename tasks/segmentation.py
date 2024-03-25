@@ -26,7 +26,7 @@ class SegmentationTask(BaseTask):
                 inputs = self.prepare_batch(inputs)
 
                 pred = self.model(inputs)
-                loss = self.loss_fn(pred, inputs["labels"])
+                loss = self.loss_fn(pred, inputs["labels"].to(self.dtype))
 
                 loss.backward()
                 self.optimizer.step()
