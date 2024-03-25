@@ -4,6 +4,7 @@ from .gpt4ts import GPT4TS
 from .dlinear import DLinear
 from .FEDformer import FEDformer
 from .PatchTST import PatchTST
+from .TimesNet import TimesNet
 
 
 model_lookup = {
@@ -12,4 +13,5 @@ model_lookup = {
     "dlinear": DLinear,
     "fedformer": FEDformer,
     "patchtst": PatchTST,
+    "timesnet": TimesNet,
 }
