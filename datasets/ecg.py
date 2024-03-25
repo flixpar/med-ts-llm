@@ -120,6 +120,10 @@ class ECGMITSegmentationDataset(ECGMITDataset):
 
         self.n_points, self.n_features = self.data.shape
 
+        desc_fn = "train_data_desc.csv" if split == "train" else "test_data_desc.csv"
+        descriptions = pd.read_csv(basepath / desc_fn, index_col=0)
+        self.descriptions = descriptions["data_desc"].to_dict()
+
     def __getitem__(self, idx):
         idx = idx * self.step_size
         idx_range = (idx, idx + self.pred_len)
@@ -127,7 +131,10 @@ class ECGMITSegmentationDataset(ECGMITDataset):
         x = self.data[slice(*idx_range),:]
         y = self.labels[slice(*idx_range)]
 
-        return {"x_enc": x, "labels": y}
+        patient_id = self.patient_ids[idx]
+        desc = self.descriptions[patient_id]
+
+        return {"x_enc": x, "labels": y, "descriptions": f"Patient description: {desc}"}
 
     def __len__(self):
         return (self.n_points - self.pred_len) // self.step_size + 1
