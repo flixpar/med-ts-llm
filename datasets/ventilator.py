@@ -89,14 +89,13 @@ class VentilatorSemanticSegmentationDataset(VentilatorDataset):
         waveform_files = basepath.glob("*.csv")
         waveform_files = [fn for fn in waveform_files if fn.name != "patient_704_vent_w_1_labeled.csv"]
         waveform_files = sorted(waveform_files)
-        dfs = [pd.read_csv(f, usecols=["flow", "label"]) for f in waveform_files]
+        dfs = [pd.read_csv(f, usecols=["pressure", "flow", "label"]) for f in waveform_files]
         dfs = [df[df.label >= 0] for df in dfs]
         dfs = [df for df in dfs if len(df) > 1000]
         data = pd.concat(dfs, ignore_index=True)
-        data = data.values
 
-        labels = data[:,1].astype(int)
-        data = data[:,0:1]
+        labels = data["label"].values.astype(int)
+        data = data[["pressure", "flow"]].values
 
         train_pct, val_pct, test_pct = 0.7, 0.15, 0.15
         train_idx = int(train_pct * data.shape[0])
