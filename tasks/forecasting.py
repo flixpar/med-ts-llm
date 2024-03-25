@@ -34,32 +34,51 @@ class ForecastTask(BaseTask):
         self.model.eval()
 
     def val(self):
-        self.model.eval()
-        scores = []
-        with torch.no_grad():
-            for inputs in tqdm(self.val_dataloader):
-                inputs = self.prepare_batch(inputs)
-
-                pred = self.model(inputs)
-                batch_scores = self.score(pred, inputs["y"])
-                scores.append(batch_scores)
-
-        mean_scores = {f"val/{metric}": sum([s[metric] for s in scores]) / len(scores) for metric in scores[0].keys()}
-        return mean_scores
+        preds, targets = self.predict(self.val_dataloader)
+        scores = self.score(preds, targets)
+        scores = {f"val/{k}": v for k, v in scores.items()}
+        self.log_scores(scores)
+        return scores
 
     def test(self):
+        preds, targets = self.predict(self.test_dataloader)
+        scores = self.score(preds, targets)
+        scores = {f"test/{k}": v for k, v in scores.items()}
+        self.log_scores(scores)
+        return scores
+
+    def predict(self, dataloader):
         self.model.eval()
-        scores = []
+
+        dataset = dataloader.dataset
+        pred_len = self.config.pred_len
+        step_size = dataset.step_size
+        dataset_len = ((dataset.n_points - pred_len) // step_size) + 1
+        n_points = pred_len + ((dataset_len - 1) * step_size)
+
+        n_features = getattr(dataset, "real_features", dataset.n_features)
+        bs = dataloader.batch_size
+
+        preds = torch.full((n_points, n_features), float("nan"))
+        targets = torch.full((n_points, n_features), float("nan"))
+
         with torch.no_grad():
-            for inputs in tqdm(self.test_dataloader):
+            for idx, inputs in tqdm(enumerate(dataloader), total=len(dataloader)):
                 inputs = self.prepare_batch(inputs)
-
                 pred = self.model(inputs)
-                batch_scores = self.score(pred, inputs["y"])
-                scores.append(batch_scores)
 
-        mean_scores = {f"test/{metric}": sum([s[metric] for s in scores]) / len(scores) for metric in scores[0].keys()}
-        return mean_scores
+                for j in range(pred.size(0)):
+                    inds = dataset.inverse_index((idx * bs) + j)
+                    time_idx, feature_idx = inds if isinstance(inds, tuple) else (inds, slice(None))
+                    time_idx = slice(time_idx, time_idx + pred.size(1))
+
+                    preds[time_idx, feature_idx] = pred[j].squeeze().cpu().detach()
+                    targets[time_idx, feature_idx] = inputs["y"][j].squeeze().cpu().detach()
+
+        assert not torch.isnan(preds).any()
+        assert not torch.isnan(targets).any()
+
+        return preds, targets
 
     def score(self, pred, target):
         return {
