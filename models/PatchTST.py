@@ -270,11 +270,11 @@ class PatchTST(nn.Module):
         dec_out = enc_out.reshape(enc_out.shape[0], -1)
         dec_out = self.projection(dec_out)
 
+        if self.num_class > 2:
+            dec_out = dec_out.reshape(dec_out.shape[0], self.pred_len, self.num_class)
+
         if not self.training:
             if self.num_class > 2:
-                dec_out = dec_out.reshape(
-                    dec_out.shape[0], self.pred_len, self.num_class
-                )
                 dec_out = F.softmax(dec_out, dim=-1)
             else:
                 dec_out = F.sigmoid(dec_out)

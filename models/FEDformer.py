@@ -252,9 +252,11 @@ class FEDformer(nn.Module):
         output = enc_out.reshape(enc_out.shape[0], -1)
         output = self.projection(output)
 
+        if self.num_class > 2:
+            output = output.reshape(output.shape[0], self.pred_len, self.num_class)
+
         if not self.training:
             if self.num_class > 2:
-                output = output.reshape(output.shape[0], self.pred_len, self.num_class)
                 output = F.softmax(output, dim=-1)
             else:
                 output = F.sigmoid(output)
@@ -281,10 +283,7 @@ class FEDformer(nn.Module):
         x_mark_dec = inputs.get("x_mark_dec", None)
         mask = inputs.get("mask", None)
 
-        if (
-            self.task_name == "long_term_forecast"
-            or self.task_name == "short_term_forecast"
-        ):
+        if self.task_name == "forecasting":
             dec_out = self.forecast(x_enc, x_mark_enc, x_dec, x_mark_dec)
             return dec_out[:, -self.pred_len :, :]  # [B, L, D]
         if self.task_name == "imputation":
