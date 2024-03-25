@@ -164,17 +164,23 @@ class BaseTask(ABC):
                 return torch.device(x)
 
     def get_dtype(self):
-        match self.config.setup.dtype:
-            case "bfloat16" | "bf16":
-                return torch.bfloat16
-            case "float16" | "half" | "fp16" | "16" | 16:
-                return torch.float16
-            case "float32" | "float" | "fp32" | "32" | 32:
-                return torch.float32
-            case "mixed":
-                return torch.float32
+        use_gpu = self.device.type == "cuda"
+        match self.config.setup.dtype, use_gpu:
+            case "bfloat16" | "bf16", True:
+                self.dtype = torch.bfloat16
+            case "float16" | "half" | "fp16" | "16" | 16, _:
+                self.dtype = torch.float16
+            case "float32" | "float" | "fp32" | "32" | 32, _:
+                self.dtype = torch.float32
+            case "mixed", _:
+                raise NotImplementedError("Mixed precision training not yet implemented")
             case _:
                 raise ValueError(f"Invalid dtype selection: {self.config.setup.dtype}")
+
+        if self.config.model == "fedformer":
+            assert self.dtype == torch.float32, "Fedformer only supports float32 dtype"
+
+        return self.dtype
 
     @classmethod
     def from_run_id(cls, run_id):

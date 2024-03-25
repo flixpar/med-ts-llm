@@ -32,7 +32,7 @@ class SemanticSegmentationTask(BaseTask):
                     pred = pred.permute(0, 2, 1)
                     labels = inputs["labels"]
                 else:
-                    labels = inputs["labels"].to(torch.dtype)
+                    labels = inputs["labels"].to(self.dtype)
                 loss = self.loss_fn(pred, labels)
 
                 loss.backward()
