@@ -26,9 +26,12 @@ class GPT4TS(nn.Module):
         self.enc_in = dataset.n_features
         self.c_out = dataset.n_features
         self.num_class = dataset.n_classes if self.task in ["classification", "semantic_segmentation"] else 0
-
-        self.pred_len = self.config.pred_len
         self.seq_len = self.config.history_len
+        if self.task == "forecasting":
+            self.pred_len = self.config.pred_len
+        else:
+            assert self.config.pred_len == self.seq_len
+            self.pred_len = 0
 
         self.patch_size = self.model_config.patching.patch_len
         self.stride = self.model_config.patching.stride

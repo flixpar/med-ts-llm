@@ -28,7 +28,11 @@ class TimesNet(nn.Module):
         self.task_name = self.config.task
 
         self.seq_len = self.config.history_len
-        self.pred_len = self.config.pred_len
+        if self.task_name == "forecasting":
+            self.pred_len = self.config.pred_len
+        else:
+            assert self.config.pred_len == self.seq_len
+            self.pred_len = 0
 
         self.enc_in = dataset.n_features
         self.c_out = dataset.n_features

@@ -68,7 +68,7 @@ class ECGMITAnomalyDetectionDataset(ECGMITDataset):
         assert self.task == "anomaly_detection"
 
         if self.split != "train":
-            basepath = Path(__file__).parent / "../data/mit_ecg/"
+            basepath = Path(__file__).parent / "../data/mit_ecg/anom/"
             labels = pd.read_csv(basepath / "test_label.csv")
             labels = labels.drop(columns=["time", "patient_id"])
             self.labels = labels.values[:,0].astype(int)
@@ -131,7 +131,7 @@ class ECGMITSegmentationDataset(ECGMITDataset):
         x = self.data[slice(*idx_range),:]
         y = self.labels[slice(*idx_range)]
 
-        patient_id = self.patient_ids[idx]
+        patient_id = self.clip_ids[idx]
         desc = self.descriptions[patient_id]
 
         return {"x_enc": x, "labels": y, "descriptions": f"Patient description: {desc}"}

@@ -67,7 +67,9 @@ class TimeLLM(nn.Module):
             case "concat":
                 self.d_model *= self.n_features
             case "independent":
-                self.n_outputs = self.pred_len
+                # self.n_outputs = self.pred_len
+                # self.indep_projection = nn.Linear(self.n_features, self.n_outputs_per_step)
+                pass
             case "add":
                 pass
             case _:
@@ -192,7 +194,7 @@ class TimeLLM(nn.Module):
 
         if self.covariate_mode == "add":
             enc_out = enc_out.reshape(bs, n_features, self.n_patches, self.d_llm)
-            enc_out = enc_out.mean(dim=1)
+            enc_out = enc_out.mean(dim=1)                           # [bs, n_patches, d_llm]
         elif self.covariate_mode == "interleave":
             enc_out = enc_out.reshape(bs, n_features, -1, self.d_llm) # [bs, n_features, n_patches, d_llm]
             enc_out = enc_out.permute(0, 2, 1, 3)                     # [bs, n_patches, n_features, d_llm]
@@ -215,7 +217,15 @@ class TimeLLM(nn.Module):
         dec_out = dec_out[:, -self.n_patches:, :self.d_ff]
         dec_out = dec_out.permute(0, 2, 1).contiguous() # [bs, d_ff, n_patches]
         dec_out = self.output_projection(dec_out)       # [bs, pred_len * n_features]
-        dec_out = dec_out.view(bs, self.pred_len, self.n_outputs_per_step).squeeze(-1)
+
+        if self.covariate_mode == "independent":
+            # dec_out = dec_out.view(bs, self.n_features, self.pred_len)
+            # dec_out = dec_out.permute(0, 2, 1).contiguous() # [bs, pred_len, n_features]
+            # dec_out = self.indep_projection(dec_out).squeeze(-1) # [bs, pred_len, n_outputs_per_step]
+            dec_out = dec_out.view(bs, self.n_features, self.pred_len, self.n_outputs_per_step).squeeze(-1)
+            dec_out = dec_out.mean(dim=1)
+        else:
+            dec_out = dec_out.view(bs, self.pred_len, self.n_outputs_per_step).squeeze(-1)
 
         if self.task in ["forecasting", "anomaly_detection"]:
             dec_out = self.normalize_layers(dec_out, "denorm")
