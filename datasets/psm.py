@@ -29,8 +29,15 @@ class PSMDataset(Dataset, ABC):
         self.data = np.nan_to_num(data.values)
 
         if config.data.normalize:
-            self.normalizer = StandardScaler()
-            self.data = self.normalizer.fit_transform(self.data)
+            if split == "train":
+                train_data = self.data
+            else:
+                train_data = pd.read_csv(basepath / "train.csv")
+                train_data = train_data.drop(columns=["timestamp_(min)"])
+                train_data = np.nan_to_num(train_data.values)
+
+            self.normalizer = StandardScaler().fit(train_data)
+            self.data = self.normalizer.transform(self.data)
 
         self.n_points = self.data.shape[0]
         self.n_features = self.data.shape[1]
