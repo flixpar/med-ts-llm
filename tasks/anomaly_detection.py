@@ -10,6 +10,8 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
+from bayes_opt import BayesianOptimization
+
 from tqdm import tqdm
 
 from .base import BaseTask
@@ -20,6 +22,7 @@ class AnomalyDetectionTask(BaseTask):
 
     def __init__(self, run_id, config, newrun=True):
         self.task = "anomaly_detection"
+        self.task_config = config.tasks.anomaly_detection
         assert config.history_len == config.pred_len, "Anomaly detection task requires history_len == pred_len"
         super(AnomalyDetectionTask, self).__init__(run_id, config, newrun)
 
@@ -106,7 +109,13 @@ class AnomalyDetectionTask(BaseTask):
         scores = scores / mean_scores.unsqueeze(0)
         scores = scores.nanmean(dim=1)
 
-        threshold = scores.quantile(torch.tensor(0.9))
+        if self.task_config.threshold == "optimize":
+            quantile = optimize_threshold(scores, labels)
+            print(f"Optimal threshold quantile: {1 - quantile}")
+        else:
+            quantile = 1 - self.task_config.threshold
+
+        threshold = scores.quantile(quantile)
         anomalies = (scores > threshold).to(torch.int)
         anomalies = adjust_anomalies(anomalies, labels)
 
@@ -171,3 +180,19 @@ def adjust_anomalies(pred, gt):
         if anomaly_state:
             pred[i] = 1
     return pred
+
+def optimize_threshold(scores, labels):
+    def score_func(q):
+        threshold = scores.quantile(q)
+        anomalies = (scores > threshold).to(torch.int)
+        anomalies = adjust_anomalies(anomalies, labels)
+        return f1_score(labels, anomalies, average="binary", zero_division=0)
+
+    optimizer = BayesianOptimization(
+        f = score_func,
+        pbounds = {"q": (0.5, 1.0)},
+        random_state = 0,
+        verbose = 0,
+    )
+    optimizer.maximize(init_points=10, n_iter=20)
+    return optimizer.max["params"]["q"]

@@ -27,6 +27,10 @@ eval_metric = "mse"
 eval_metric_direction = "min"
 
 
+[tasks.anomaly_detection]
+threshold = "optimize"
+
+
 [models.timellm]
 d_model = 16
 n_heads = 8
