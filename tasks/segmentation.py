@@ -4,6 +4,8 @@ import torch.nn.functional as F
 import math
 import scipy
 
+from bayes_opt import BayesianOptimization
+
 from tqdm import tqdm
 
 from .base import BaseTask
@@ -95,7 +97,14 @@ class SegmentationTask(BaseTask):
         # pred_scores = smooth_scores(pred_scores, 25, "mean")
         # pred_points = find_peaks_threshold(pred_scores, 0.55)
 
-        distance_thresh = self.config.tasks.segmentation.distance_thresh
+        if self.config.tasks.segmentation.distance_thresh == "auto":
+            distance_thresh = n_points / targets.sum().item()
+        elif self.config.tasks.segmentation.distance_thresh == "optimize":
+            est = n_points / targets.sum().item()
+            distance_thresh = optimize_threshold(pred_scores, targets, est)
+        else:
+            distance_thresh = self.config.tasks.segmentation.distance_thresh
+
         pred_points = scipy.signal.find_peaks(pred_scores.numpy(), distance=distance_thresh)[0]
         pred_points = torch.tensor(pred_points, dtype=torch.int)
 
@@ -138,7 +147,6 @@ class SegmentationTask(BaseTask):
             "point_rmse": point_dists.pow(2).min(dim=0).values.float().mean().sqrt().item(),
 
             "segment_miou": segment_dists.max(dim=0).values.float().mean().item(),
-            "segment_miou_neg": -segment_dists.max(dim=0).values.float().mean().item(),
 
             "pred_label_ratio": pred_labels.sum().item() / target_labels.sum().item(),
         }
@@ -210,3 +218,33 @@ def compute_thresh_metrics(dists, thresh, flip=False):
     f1 = 2 * (prec * rec) / (prec + rec)
 
     return {"acc": acc, "prec": prec, "rec": rec, "f1": f1}
+
+def optimize_threshold(pred_scores, targets, est):
+    pred_scores = pred_scores.numpy()
+
+    target_points = targets.nonzero().squeeze()
+    target_segments = torch.cat([torch.tensor([0]), target_points, torch.tensor([len(pred_scores)-1])])
+    target_segments = target_segments.unfold(0, 2, 1)
+
+    def score_fn(thresh):
+        pred_points = scipy.signal.find_peaks(pred_scores, distance=thresh)[0]
+        pred_points = torch.tensor(pred_points, dtype=torch.int)
+
+        pred_labels = torch.zeros_like(targets)
+        pred_labels[pred_points] = 1
+
+        pred_segments = torch.cat([torch.tensor([0]), pred_points, torch.tensor([len(pred_scores)-1])])
+        pred_segments = pred_segments.unfold(0, 2, 1)
+
+        segment_dists = all_pairs_iou(pred_segments, target_segments)
+        seg_miou = segment_dists.max(dim=0).values.float().mean().item()
+        return seg_miou
+
+    optimizer = BayesianOptimization(
+        f = score_fn,
+        pbounds = {"thresh": (0.5 * est, 1.75 * est)},
+        random_state = 0,
+        verbose = 0,
+    )
+    optimizer.maximize(init_points=5, n_iter=10)
+    return optimizer.max["params"]["thresh"]

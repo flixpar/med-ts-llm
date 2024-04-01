@@ -30,7 +30,7 @@ eval_metric_direction = "max"
 [tasks.segmentation]
 mode = "boundary-prediction"
 # mode = "steps-to-boundary"
-distance_thresh = 300
+distance_thresh = "auto"
 
 
 [models.timellm]
