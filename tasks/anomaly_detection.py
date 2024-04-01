@@ -48,23 +48,22 @@ class AnomalyDetectionTask(BaseTask):
         self.model.eval()
 
     def val(self):
-        self.model.eval()
-        scores = []
-        with torch.no_grad():
-            for inputs in tqdm(self.val_dataloader):
-                inputs = self.prepare_batch(inputs)
+        results = self.predict(self.val_dataloader)
 
-                pred = self.model(inputs)
-                batch_scores = self.score(pred, inputs["x_enc"].detach())
-                scores.append(batch_scores)
+        anom_scores = self.score_anomalies(results.anomaly_preds, results.anomaly_labels)
+        recon_scores = self.score(results.recon_preds, results.recon_targets)
+        scores = anom_scores | recon_scores
+        scores = {f"val/{metric}": value for metric, value in scores.items()}
+        self.log_scores(scores)
 
-        mean_scores = {f"val/{metric}": sum([s[metric] for s in scores]) / len(scores) for metric in scores[0].keys()}
-        return mean_scores
+        return scores
 
     def test(self):
         results = self.predict(self.test_dataloader)
 
-        scores = self.score_anomalies(results.anomaly_preds, results.anomaly_labels)
+        anom_scores = self.score_anomalies(results.anomaly_preds, results.anomaly_labels)
+        recon_scores = self.score(results.recon_preds, results.recon_targets)
+        scores = anom_scores | recon_scores
         scores = {f"test/{metric}": value for metric, value in scores.items()}
         self.log_scores(scores)
 
@@ -100,13 +99,21 @@ class AnomalyDetectionTask(BaseTask):
                     targets[time_idx, feature_idx] = inputs["x_enc"][j].squeeze().cpu().detach()
                     labels[time_idx] = inputs["labels"][j].squeeze().cpu().detach()
 
+        if step_size > pred_len:
+            cutoff = n_points - (n_points % step_size)
+            preds, targets, labels = preds[:cutoff,:], targets[:cutoff,:], labels[:cutoff]
+            preds = preds.reshape(-1, step_size, n_features)[:, :pred_len, :].reshape(-1, n_features)
+            targets = targets.reshape(-1, step_size, n_features)[:, :pred_len, :].reshape(-1, n_features)
+            labels = labels.reshape(-1, step_size)[:, :pred_len].reshape(-1)
+
         assert not torch.isnan(preds).any()
         assert not torch.isnan(targets).any()
         assert not (labels < 0).any()
 
         scores = F.mse_loss(preds, targets, reduction="none")
-        mean_scores = scores.mean(dim=0)
-        scores = scores / mean_scores.unsqueeze(0)
+        if self.task_config.normalize_by_feature:
+            mean_scores = scores.mean(dim=0)
+            scores = scores / mean_scores.unsqueeze(0)
         scores = scores.nanmean(dim=1)
 
         if self.task_config.threshold == "optimize":
