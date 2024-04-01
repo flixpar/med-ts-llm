@@ -190,7 +190,7 @@ class BaseTask(ABC):
 
         trainer = cls(run_id, config, newrun=False)
 
-        modelpath = basepath / "checkpoints/latest.pt"
+        modelpath = basepath / "checkpoints/best.pt"
         state = torch.load(modelpath)
         _, unexpected = trainer.model.load_state_dict(state["model"], strict=False)
         assert not unexpected, f"Unexpected keys in model state: {unexpected}"
