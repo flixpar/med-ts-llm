@@ -130,7 +130,7 @@ class TimeLLM(nn.Module):
             tokenizer.add_special_tokens({"pad_token": pad_token})
             tokenizer.pad_token = pad_token
 
-        self.word_embeddings = llm.get_input_embeddings().weight.clone().detach()
+        self.word_embeddings = llm.get_input_embeddings().weight
         self.vocab_size = self.word_embeddings.shape[0]
 
         self.d_llm = llm_config.hidden_size
