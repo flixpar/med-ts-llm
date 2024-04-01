@@ -130,7 +130,7 @@ class TimeLLM(nn.Module):
             tokenizer.add_special_tokens({"pad_token": pad_token})
             tokenizer.pad_token = pad_token
 
-        self.word_embeddings = llm.get_input_embeddings().weight
+        self.word_embeddings = llm.get_input_embeddings().weight.clone().detach()
         self.vocab_size = self.word_embeddings.shape[0]
 
         self.d_llm = llm_config.hidden_size
@@ -225,10 +225,12 @@ class TimeLLM(nn.Module):
             dec_out = dec_out.view(bs, self.n_features, self.pred_len, self.n_outputs_per_step).squeeze(-1)
             dec_out = dec_out.mean(dim=1)
         else:
-            dec_out = dec_out.view(bs, self.pred_len, self.n_outputs_per_step).squeeze(-1)
+            dec_out = dec_out.view(bs, self.pred_len, self.n_outputs_per_step)
 
         if self.task in ["forecasting", "anomaly_detection"]:
             dec_out = self.normalize_layers(dec_out, "denorm")
+        else:
+            dec_out = dec_out.squeeze(-1)
 
         return dec_out
 

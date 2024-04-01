@@ -6,6 +6,9 @@ from utils import summarize_config
 
 class PrintLogger(BaseLogger):
     def __init__(self, trainer, config, newrun=True):
+        self.trainer = trainer
+        self.config = config
+
         config = summarize_config(config)
         config = json.dumps(config, indent="\t")
 
