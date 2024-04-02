@@ -104,9 +104,9 @@ class SegmentationTask(BaseTask):
         # pred_points = find_peaks_threshold(pred_scores, 0.55)
 
         if self.config.tasks.segmentation.distance_thresh == "auto":
-            distance_thresh = n_points / targets.sum().item()
+            distance_thresh = 0.75 * targets.size(0) / targets.sum().item()
         elif self.config.tasks.segmentation.distance_thresh == "optimize":
-            est = n_points / targets.sum().item()
+            est = targets.size(0) / targets.sum().item()
             distance_thresh = optimize_threshold(pred_scores, targets, est)
         else:
             distance_thresh = self.config.tasks.segmentation.distance_thresh
@@ -234,12 +234,12 @@ def optimize_threshold(pred_scores, targets, est):
 
     def score_fn(thresh):
         pred_points = scipy.signal.find_peaks(pred_scores, distance=thresh)[0]
-        pred_points = torch.tensor(pred_points, dtype=torch.int)
 
-        pred_labels = torch.zeros_like(targets)
-        pred_labels[pred_points] = 1
-
-        pred_segments = torch.cat([torch.tensor([0]), pred_points, torch.tensor([len(pred_scores)-1])])
+        pred_segments = torch.cat([
+            torch.tensor([0], dtype=torch.int),
+            torch.tensor(pred_points, dtype=torch.int),
+            torch.tensor([len(pred_scores)-1], dtype=torch.int),
+        ])
         pred_segments = pred_segments.unfold(0, 2, 1)
 
         segment_dists = all_pairs_iou(pred_segments, target_segments)
@@ -248,9 +248,10 @@ def optimize_threshold(pred_scores, targets, est):
 
     optimizer = BayesianOptimization(
         f = score_fn,
-        pbounds = {"thresh": (0.5 * est, 1.75 * est)},
+        pbounds = {"thresh": (0.5 * est, 1.25 * est)},
         random_state = 0,
         verbose = 0,
+        allow_duplicate_points=True,
     )
     optimizer.maximize(init_points=5, n_iter=10)
     return optimizer.max["params"]["thresh"]
