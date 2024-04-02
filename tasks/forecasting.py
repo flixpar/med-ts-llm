@@ -75,6 +75,12 @@ class ForecastTask(BaseTask):
                     preds[time_idx, feature_idx] = pred[j].squeeze().cpu().detach()
                     targets[time_idx, feature_idx] = inputs["y"][j].squeeze().cpu().detach()
 
+        if step_size > pred_len:
+            cutoff = n_points - (n_points % step_size)
+            preds, targets = preds[:cutoff,:], targets[:cutoff,:]
+            preds = preds.reshape(-1, step_size, n_features)[:, :pred_len, :].reshape(-1, n_features)
+            targets = targets.reshape(-1, step_size, n_features)[:, :pred_len, :].reshape(-1, n_features)
+
         assert not torch.isnan(preds).any()
         assert not torch.isnan(targets).any()
 

@@ -92,6 +92,12 @@ class SemanticSegmentationTask(BaseTask):
         if n_classes == 2:
             preds[:, 0] = 1 - preds[:, 1]
 
+        if step_size > pred_len:
+            cutoff = n_points - (n_points % step_size)
+            preds, targets = preds[:cutoff,:], targets[:cutoff]
+            preds = preds.reshape(-1, step_size, n_classes)[:, :pred_len, :].reshape(-1, n_classes)
+            targets = targets.reshape(-1, step_size)[:, :pred_len].reshape(-1)
+
         assert not torch.isnan(preds).any()
         assert not (targets < 0).any()
 
