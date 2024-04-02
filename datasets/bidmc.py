@@ -1,6 +1,7 @@
 from abc import ABC
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
@@ -76,6 +77,23 @@ class BIDMCSegmentationDataset(BIDMCDataset):
         super(BIDMCSegmentationDataset, self).__init__(config, split)
         assert self.task == "segmentation"
         assert self.pred_len == self.history_len
+
+        if config.tasks.segmentation.mode == "steps-to-boundary":
+            labels_binary = self.labels
+            changepts = np.where(labels_binary)[0]
+            changepts = np.append(changepts, len(labels_binary))
+            labels = np.zeros(len(labels_binary), dtype=np.float32)
+            seg_len = changepts[0]
+            for i in range(len(labels)):
+                labels[i] = (changepts[0] - i) / seg_len
+                if i == changepts[0]:
+                    changepts = changepts[1:]
+                    seg_len = changepts[0] - i
+            self.labels = labels
+        elif config.tasks.segmentation.mode == "boundary-prediction":
+            pass
+        else:
+            raise ValueError(f"Segmentation mode {config.tasks.segmentation.mode} not supported")
 
     def __getitem__(self, idx):
         idx = idx * self.step_size

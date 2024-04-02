@@ -55,6 +55,7 @@ class TimeLLM(nn.Module):
             self.n_outputs_per_step = self.n_classes if self.n_classes > 2 else 1
         elif self.task == "segmentation":
             self.n_outputs_per_step = 1
+            assert self.config.tasks.segmentation.mode in ["boundary-prediction", "steps-to-boundary"]
         else:
             raise ValueError(f"Task {self.task} is not supported.")
         self.n_outputs = self.n_outputs_per_step * self.pred_len
@@ -163,10 +164,6 @@ class TimeLLM(nn.Module):
         elif self.task == "segmentation":
             if self.config.tasks.segmentation.mode == "boundary-prediction":
                 pred = F.sigmoid(pred)
-            elif self.config.tasks.segmentation.mode == "steps-to-boundary":
-                raise NotImplementedError("Steps-to-boundary segmentation not yet implemented for TimeLLM")
-            else:
-                raise ValueError(f"Segmentation mode {self.config.tasks.segmentation.mode} not implemented for TimeLLM")
 
         return pred
 

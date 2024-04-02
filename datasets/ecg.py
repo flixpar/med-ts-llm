@@ -1,6 +1,7 @@
 from abc import ABC
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
@@ -109,7 +110,6 @@ class ECGMITSegmentationDataset(ECGMITDataset):
         feature_cols = data.columns.difference([time_col, clip_col, label_col])
 
         self.data = data[feature_cols].values
-        self.labels = data[label_col].values.astype(int)
         self.clip_ids = data[clip_col].values.astype(int)
         self.timestamps = data[time_col].values
 
@@ -117,6 +117,23 @@ class ECGMITSegmentationDataset(ECGMITDataset):
             train_data = pd.read_csv(basepath / "train.csv")[feature_cols].values
             self.normalizer = StandardScaler().fit(train_data)
             self.data = self.normalizer.transform(self.data)
+
+        if config.tasks.segmentation.mode == "steps-to-boundary":
+            labels_binary = data[label_col].values.astype(int)
+            changepts = np.where(labels_binary)[0]
+            changepts = np.append(changepts, len(labels_binary))
+            labels = np.zeros(len(labels_binary), dtype=np.float32)
+            seg_len = changepts[0]
+            for i in range(len(labels)):
+                labels[i] = (changepts[0] - i) / seg_len
+                if i == changepts[0]:
+                    changepts = changepts[1:]
+                    seg_len = changepts[0] - i
+            self.labels = labels
+        elif config.tasks.segmentation.mode == "boundary-prediction":
+            self.labels = data[label_col].values.astype(int)
+        else:
+            raise ValueError(f"Segmentation mode {config.tasks.segmentation.mode} not supported")
 
         self.n_points, self.n_features = self.data.shape
 

@@ -15,10 +15,8 @@ class SegmentationTask(BaseTask):
 
     def __init__(self, run_id, config, newrun=True):
         self.task = "segmentation"
+        self.segmentation_mode = config.tasks.segmentation.mode
         super(SegmentationTask, self).__init__(run_id, config, newrun)
-
-        self.segmentation_mode = self.config.tasks.segmentation.mode
-        assert self.segmentation_mode == "boundary-prediction"
 
     def train(self):
         for epoch in range(self.config.training.epochs):
@@ -58,7 +56,14 @@ class SegmentationTask(BaseTask):
     def build_loss(self):
         match self.config.training.loss:
             case "bce":
+                assert self.config.tasks.segmentation.mode == "boundary-prediction"
                 self.loss_fn = torch.nn.BCEWithLogitsLoss()
+            case "mse":
+                assert self.config.tasks.segmentation.mode == "steps-to-boundary"
+                self.loss_fn = torch.nn.MSELoss()
+            case "mae":
+                assert self.config.tasks.segmentation.mode == "steps-to-boundary"
+                self.loss_fn = torch.nn.L1Loss()
             case _:
                 raise ValueError(f"Invalid loss function selection: {self.config.training.loss}")
         return self.loss_fn
@@ -73,8 +78,10 @@ class SegmentationTask(BaseTask):
         n_points = pred_len + ((dataset_len - 1) * step_size)
         bs = dataloader.batch_size
 
+        target_dtype = torch.int if self.segmentation_mode == "boundary-prediction" else torch.float
+
         preds = torch.full((n_points,), float("nan"))
-        targets = torch.full((n_points,), -1, dtype=torch.int)
+        targets = torch.full((n_points,), -1, dtype=target_dtype)
 
         with torch.no_grad():
             for idx, inputs in tqdm(enumerate(dataloader), total=len(dataloader)):
@@ -98,13 +105,23 @@ class SegmentationTask(BaseTask):
         assert not torch.isnan(preds).any()
         assert not (targets < 0).any()
 
+        if self.segmentation_mode == "boundary-prediction":
+            return self.process_preds_boundary_prediction(preds, targets)
+        elif self.segmentation_mode == "steps-to-boundary":
+            return self.process_preds_steps_to_boundary(preds, targets)
+        else:
+            raise ValueError(f"Segmentation mode {self.segmentation_mode} not supported")
+
+    def process_preds_boundary_prediction(self, preds, targets):
         pred_scores = preds.clone()
 
         # pred_scores = smooth_scores(pred_scores, 25, "mean")
         # pred_points = find_peaks_threshold(pred_scores, 0.55)
 
         if self.config.tasks.segmentation.distance_thresh == "auto":
-            distance_thresh = 0.75 * targets.size(0) / targets.sum().item()
+            # distance_thresh = 0.75 * targets.size(0) / targets.sum().item()
+            target_seg_lens = targets.nonzero().squeeze().unfold(0, 2, 1).diff(dim=1).squeeze()
+            distance_thresh = target_seg_lens.float().quantile(0.1).item()
         elif self.config.tasks.segmentation.distance_thresh == "optimize":
             est = targets.size(0) / targets.sum().item()
             distance_thresh = optimize_threshold(pred_scores, targets, est)
@@ -113,6 +130,44 @@ class SegmentationTask(BaseTask):
 
         pred_points = scipy.signal.find_peaks(pred_scores.numpy(), distance=distance_thresh)[0]
         pred_points = torch.tensor(pred_points, dtype=torch.int)
+
+        pred_labels = torch.zeros_like(targets)
+        pred_labels[pred_points] = 1
+
+        label_points = targets.nonzero().squeeze()
+
+        pred_segments = torch.cat([torch.tensor([0]), pred_points, torch.tensor([len(pred_scores)-1])])
+        pred_segments = pred_segments.unfold(0, 2, 1)
+
+        label_segments = torch.cat([torch.tensor([0]), label_points, torch.tensor([len(pred_scores)-1])])
+        label_segments = label_segments.unfold(0, 2, 1)
+
+        return {
+            "preds_raw": preds,
+            "pred_points": pred_points,
+            "pred_labels": pred_labels,
+            "pred_segments": pred_segments,
+            "labels": targets,
+            "label_points": label_points,
+            "label_segments": label_segments,
+        }
+
+    def process_preds_steps_to_boundary(self, preds, targets):
+        pred_scores = preds.clone()
+
+        targets = (targets == 0).int()
+        threshold_est = targets.size(0) / targets.sum().item()
+
+        pts_max = scipy.signal.find_peaks(pred_scores.numpy(), prominence=0.5)[0]
+        pts_min = scipy.signal.find_peaks(-pred_scores.numpy(), prominence=0.5)[0]
+        pts_a, pts_b = (pts_max, pts_min) if len(pts_max) >= len(pts_min) else (pts_min, pts_max)
+        pts_a, pts_b = torch.tensor(pts_a), torch.tensor(pts_b)
+
+        pred_points = torch.empty_like(pts_a)
+        for idx, pt in enumerate(pts_a):
+            dists = (pts_b - pt).abs()
+            closest_idx = dists.argmin().item()
+            pred_points[idx] = pt if dists[closest_idx] > threshold_est/2 else pts_b[closest_idx]
 
         pred_labels = torch.zeros_like(targets)
         pred_labels[pred_points] = 1
