@@ -17,7 +17,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 class TimeLLM(nn.Module):
 
-    supported_tasks = ["forecasting", "anomaly_detection", "semantic_segmentation", "segmentation"]
+    supported_tasks = ["forecasting", "anomaly_detection", "semantic_segmentation", "segmentation", "pretraining"]
     supported_modes = ["univariate", "multivariate"]
 
     def __init__(self, config, dataset):
@@ -49,7 +49,7 @@ class TimeLLM(nn.Module):
 
         self.n_classes = dataset.n_classes if self.task in ["classification", "semantic_segmentation"] else 0
 
-        if self.task in ["forecasting", "anomaly_detection"]:
+        if self.task in ["forecasting", "anomaly_detection", "pretraining"]:
             self.n_outputs_per_step = self.n_features
         elif self.task == "semantic_segmentation":
             self.n_outputs_per_step = self.n_classes if self.n_classes > 2 else 1
@@ -270,7 +270,7 @@ class TimeLLM(nn.Module):
         return prompts
 
     def get_task_description(self):
-        if self.task == "forecasting":
+        if self.task == "forecasting" or self.task == "pretraining":
             self.task_description = f"Forecast the next {self.pred_len} steps given the previous {self.seq_len} steps of data."
         elif self.task == "anomaly_detection":
             self.task_description = f"Reconstruct the past {self.seq_len} steps of data as accurately as possible using the following information."
