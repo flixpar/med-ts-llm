@@ -57,6 +57,7 @@ class DLinear(nn.Module):
             self.projection = nn.Linear(self.channels * self.seq_len, out_size)
         elif self.task_name == "segmentation":
             self.projection = nn.Linear(self.channels * self.seq_len, self.seq_len)
+            self.seg_mode = self.config.tasks.segmentation.mode
 
     def encoder(self, x):
         seasonal_init, trend_init = self.decompsition(x)
@@ -106,7 +107,7 @@ class DLinear(nn.Module):
         enc_out = F.gelu(enc_out)
         output = enc_out.reshape(enc_out.shape[0], -1)
         output = self.projection(output)
-        if not self.training:
+        if not self.training and self.seg_mode == "boundary-prediction":
             output = F.sigmoid(output)
         return output
 

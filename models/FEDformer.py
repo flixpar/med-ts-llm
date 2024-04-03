@@ -193,6 +193,7 @@ class FEDformer(nn.Module):
             self.projection = nn.Linear(
                 self.d_model * self.seq_len, self.seq_len
             )
+            self.seg_mode = self.config.tasks.segmentation.mode
 
     def forecast(self, x_enc, x_mark_enc, x_dec, x_mark_dec):
         # decomp init
@@ -271,7 +272,7 @@ class FEDformer(nn.Module):
         output = enc_out.reshape(enc_out.shape[0], -1)
         output = self.projection(output)
 
-        if not self.training:
+        if not self.training and self.seg_mode == "boundary-prediction":
             output = F.sigmoid(output)
 
         return output

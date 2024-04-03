@@ -74,6 +74,7 @@ class GPT4TS(nn.Module):
             self.out_layer = nn.Linear(self.d_ff, n_output, bias=True)
         if self.task == "segmentation":
             assert self.config.tasks.segmentation.mode == "boundary-prediction"
+            self.seg_mode = self.config.tasks.segmentation.mode
             self.ln_proj = nn.LayerNorm(self.d_ff)
             self.out_layer = nn.Linear(self.d_ff, 1, bias=True)
 
@@ -240,7 +241,7 @@ class GPT4TS(nn.Module):
         dec_out = self.out_layer(dec_out)
         dec_out = dec_out.squeeze(-1)
 
-        if not self.training:
+        if not self.training and self.seg_mode == "boundary-prediction":
             dec_out = torch.sigmoid(dec_out)
 
         return dec_out

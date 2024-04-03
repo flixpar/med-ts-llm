@@ -120,6 +120,7 @@ class PatchTST(nn.Module):
             )
         elif self.task_name == "segmentation":
             self.projection = nn.Linear(self.head_nf * self.enc_in, self.pred_len)
+            self.seg_mode = self.config.tasks.segmentation.mode
 
     def forecast(self, x_enc, x_mark_enc, x_dec, x_mark_dec):
         # Normalization from Non-stationary Transformer
@@ -311,7 +312,7 @@ class PatchTST(nn.Module):
         dec_out = enc_out.reshape(enc_out.shape[0], -1)
         dec_out = self.projection(dec_out)
 
-        if not self.training:
+        if not self.training and self.seg_mode == "boundary-prediction":
             dec_out = F.sigmoid(dec_out)
 
         return dec_out

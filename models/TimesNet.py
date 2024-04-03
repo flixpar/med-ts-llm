@@ -80,6 +80,7 @@ class TimesNet(nn.Module):
             self.projection = nn.Linear(self.model_config.d_model, n_outputs)
         if self.task_name == "segmentation":
             self.projection = nn.Linear(self.model_config.d_model, 1)
+            self.seg_mode = self.config.tasks.segmentation.mode
 
     def forecast(self, x_enc, x_mark_enc, x_dec, x_mark_dec):
         # Normalization from Non-stationary Transformer
@@ -219,7 +220,7 @@ class TimesNet(nn.Module):
         dec_out = self.projection(enc_out)
         dec_out = dec_out.squeeze(-1)
 
-        if not self.training:
+        if not self.training and self.seg_mode == "boundary-prediction":
             dec_out = F.sigmoid(dec_out)
 
         return dec_out
