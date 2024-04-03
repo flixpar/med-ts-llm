@@ -68,9 +68,9 @@ class TimeLLM(nn.Module):
             case "concat":
                 self.d_model *= self.n_features
             case "independent":
-                # self.n_outputs = self.pred_len
-                # self.indep_projection = nn.Linear(self.n_features, self.n_outputs_per_step)
                 pass
+            case "merge-end":
+                self.feature_weighting = nn.Linear(self.n_features * self.n_outputs_per_step, self.n_outputs_per_step)
             case "add":
                 pass
             case _:
@@ -216,11 +216,12 @@ class TimeLLM(nn.Module):
         dec_out = self.output_projection(dec_out)       # [bs, pred_len * n_features]
 
         if self.covariate_mode == "independent":
-            # dec_out = dec_out.view(bs, self.n_features, self.pred_len)
-            # dec_out = dec_out.permute(0, 2, 1).contiguous() # [bs, pred_len, n_features]
-            # dec_out = self.indep_projection(dec_out).squeeze(-1) # [bs, pred_len, n_outputs_per_step]
-            dec_out = dec_out.view(bs, self.n_features, self.pred_len, self.n_outputs_per_step).squeeze(-1)
+            dec_out = dec_out.view(bs, self.n_features, self.pred_len, self.n_outputs_per_step)
             dec_out = dec_out.mean(dim=1)
+        elif self.covariate_mode == "merge-end":
+            dec_out = dec_out.view(bs, self.n_features, self.pred_len, self.n_outputs_per_step)
+            dec_out = dec_out.permute(0, 2, 3, 1).view(bs, self.pred_len, -1).contiguous() # [bs, pred_len, n_features*n_outputs_per_step]
+            dec_out = self.feature_weighting(dec_out) # [bs, pred_len, n_outputs_per_step]
         else:
             dec_out = dec_out.view(bs, self.pred_len, self.n_outputs_per_step)
 
