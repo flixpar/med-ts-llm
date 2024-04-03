@@ -21,6 +21,8 @@ class dict_to_object(object):
         return {k: v.to_dict() if isinstance(v, dict_to_object) else v for k, v in self.__dict__.items()}
     def get(self, key, default=None):
         return self.__dict__.get(key, default)
+    def copy(self):
+        return deepcopy(self)
 
 def get_logging_tags(config):
     tags = [

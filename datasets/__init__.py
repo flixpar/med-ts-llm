@@ -7,6 +7,7 @@ from .bidmc import BIDMCDatasetSelector
 from .ludb import LUDBDatasetSelector
 
 from .util import Multi2UniDataset
+from .util import PretrainingDataset
 
 
 dataset_lookup = {

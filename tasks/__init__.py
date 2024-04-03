@@ -2,6 +2,7 @@ from .forecasting import ForecastTask
 from .anomaly_detection import AnomalyDetectionTask
 from .segmentation import SegmentationTask
 from .semantic_segmentation import SemanticSegmentationTask
+from .pretraining import PretrainingTask
 
 
 task_lookup = {
@@ -9,6 +10,7 @@ task_lookup = {
     "anomaly_detection": AnomalyDetectionTask,
     "segmentation": SegmentationTask,
     "semantic_segmentation": SemanticSegmentationTask,
+    "pretraining": PretrainingTask,
 }
 
 def get_trainer(run_id, config):

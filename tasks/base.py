@@ -8,10 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
 from torch.utils.data import DataLoader
-
 import pytorch_optimizer
-
-import wandb
 
 from models import model_lookup
 from datasets import get_dataset
@@ -30,6 +27,7 @@ class BaseTask(ABC):
         self.run_id = run_id
         self.config = config
         self.newrun = newrun
+        self.task = config.task
 
         self.device = self.get_device()
         self.dtype = self.get_dtype()
