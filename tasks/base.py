@@ -100,24 +100,27 @@ class BaseTask(ABC):
 
     def build_dataloaders(self):
         num_workers = self.config.setup.num_workers
-        num_workers = os.cpu_count()//2 if num_workers == "auto" else num_workers
+        num_workers = os.cpu_count()//4 if num_workers == "auto" else num_workers
         self.train_dataloader = DataLoader(
             self.train_dataset,
             batch_size = self.config.training.batch_size,
             shuffle = True,
             num_workers = num_workers,
+            pin_memory = True,
         )
         self.val_dataloader = DataLoader(
             self.val_dataset,
             batch_size = self.config.training.batch_size,
             shuffle = False,
             num_workers = num_workers,
+            pin_memory = True,
         )
         self.test_dataloader = DataLoader(
             self.test_dataset,
             batch_size = self.config.training.batch_size,
             shuffle = False,
             num_workers = num_workers,
+            pin_memory = True,
         )
 
     def prepare_batch(self, batch):
@@ -181,14 +184,16 @@ class BaseTask(ABC):
         return self.dtype
 
     @classmethod
-    def from_run_id(cls, run_id):
+    def from_run_id(cls, run_id, cfg=None, ckpt="latest"):
         basepath = Path(__file__).parent / f"../outputs/logs/{run_id}/"
         config = toml.load(basepath / "config.toml")
+        if cfg is not None:
+            config = config | cfg
         config = dict_to_object(config)
 
         trainer = cls(run_id, config, newrun=False)
 
-        modelpath = basepath / "checkpoints/best.pt"
+        modelpath = basepath / f"checkpoints/{ckpt}.pt"
         state = torch.load(modelpath)
         _, unexpected = trainer.model.load_state_dict(state["model"], strict=False)
         assert not unexpected, f"Unexpected keys in model state: {unexpected}"
