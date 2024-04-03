@@ -92,9 +92,8 @@ class PatchTST(nn.Module):
         )
 
         # Prediction Head
-        self.head_nf = self.model_config.d_model * int(
-            (self.seq_len - self.patch_len) / self.stride + 2
-        )
+        self.n_patches = int((self.seq_len - self.patch_len) / self.stride + 2)
+        self.head_nf = self.model_config.d_model * self.n_patches
         if self.task_name == "forecasting":
             self.head = FlattenHead(
                 self.enc_in,
@@ -116,10 +115,10 @@ class PatchTST(nn.Module):
         elif self.task_name == "semantic_segmentation":
             n_out = self.num_class if self.num_class > 2 else 1
             self.projection = nn.Linear(
-                self.head_nf * self.enc_in, self.pred_len * n_out
+                self.head_nf * self.enc_in, self.seq_len * n_out
             )
         elif self.task_name == "segmentation":
-            self.projection = nn.Linear(self.head_nf * self.enc_in, self.pred_len)
+            self.projection = nn.Linear(self.head_nf * self.enc_in, self.seq_len)
             self.seg_mode = self.config.tasks.segmentation.mode
 
     def forecast(self, x_enc, x_mark_enc, x_dec, x_mark_dec):
