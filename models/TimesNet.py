@@ -279,6 +279,7 @@ class TimesBlock(nn.Module):
     def forward(self, x):
         B, T, N = x.size()
         period_list, period_weight = FFT_for_Period(x, self.k)
+        period_weight = period_weight.to(x.dtype)
 
         res = []
         for i in range(self.k):
@@ -287,8 +288,9 @@ class TimesBlock(nn.Module):
             if (self.seq_len + self.pred_len) % period != 0:
                 length = (((self.seq_len + self.pred_len) // period) + 1) * period
                 padding = torch.zeros(
-                    [x.shape[0], (length - (self.seq_len + self.pred_len)), x.shape[2]]
-                ).to(x.device)
+                    [x.shape[0], (length - (self.seq_len + self.pred_len)), x.shape[2]],
+                    device=x.device, dtype=x.dtype,
+                )
                 out = torch.cat([x, padding], dim=1)
             else:
                 length = self.seq_len + self.pred_len
