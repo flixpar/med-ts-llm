@@ -57,7 +57,7 @@ class DLinear(nn.Module):
             self.projection = nn.Linear(self.channels * self.seq_len, out_size)
         elif self.task_name == "segmentation":
             self.projection = nn.Linear(self.channels * self.seq_len, self.seq_len)
-            self.seg_mode = self.config.tasks.segmentation.mode
+            self.seg_mode = config.tasks.segmentation.mode
 
     def encoder(self, x):
         seasonal_init, trend_init = self.decompsition(x)
