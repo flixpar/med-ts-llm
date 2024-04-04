@@ -21,18 +21,6 @@ class ECGMITDataset(Dataset, ABC):
         if self.split == "test":
             self.step_size = self.pred_len
 
-        basepath = Path(__file__).parent / "../data/mit_ecg/anom/"
-        split_fn = "train.csv" if split == "train" else "test.csv"
-        data = pd.read_csv(basepath / split_fn)
-        data = data.drop(columns=["time", "patient_id"])
-        self.data = data.values
-
-        if config.data.normalize:
-            self.normalizer = StandardScaler()
-            self.data = self.normalizer.fit_transform(self.data)
-
-        self.n_points = self.data.shape[0]
-        self.n_features = self.data.shape[1]
         self.mode = "multivariate"
 
         self.description = "The MIT-BIH Arrhythmia Database contains excerpts of two-channel ambulatory ECG from a mixed population of inpatients and outpatients, digitized at 360 samples per second per channel with 11-bit resolution over a 10 mV range."
@@ -45,6 +33,19 @@ class ECGMITForecastingDataset(ECGMITDataset):
     def __init__(self, config, split):
         super(ECGMITForecastingDataset, self).__init__(config, split)
         assert self.task == "forecasting"
+
+        basepath = Path(__file__).parent / "../data/mit_ecg/anom/"
+        split_fn = "train.csv" if split == "train" else "test.csv"
+        data = pd.read_csv(basepath / split_fn)
+        data = data.drop(columns=["time", "patient_id"])
+        self.data = data.values
+
+        if config.data.normalize:
+            self.normalizer = StandardScaler()
+            self.data = self.normalizer.fit_transform(self.data)
+
+        self.n_points = self.data.shape[0]
+        self.n_features = self.data.shape[1]
 
     def __getitem__(self, idx):
         idx = idx * self.step_size
@@ -67,6 +68,19 @@ class ECGMITAnomalyDetectionDataset(ECGMITDataset):
     def __init__(self, config, split):
         super(ECGMITAnomalyDetectionDataset, self).__init__(config, split)
         assert self.task == "anomaly_detection"
+
+        basepath = Path(__file__).parent / "../data/mit_ecg/anom/"
+        split_fn = "train.csv" if split == "train" else "test.csv"
+        data = pd.read_csv(basepath / split_fn)
+        data = data.drop(columns=["time", "patient_id"])
+        self.data = data.values
+
+        if config.data.normalize:
+            self.normalizer = StandardScaler()
+            self.data = self.normalizer.fit_transform(self.data)
+
+        self.n_points = self.data.shape[0]
+        self.n_features = self.data.shape[1]
 
         if self.split != "train":
             basepath = Path(__file__).parent / "../data/mit_ecg/anom/"
@@ -140,6 +154,7 @@ class ECGMITSegmentationDataset(ECGMITDataset):
         desc_fn = "train_data_desc.csv" if split == "train" else "test_data_desc.csv"
         descriptions = pd.read_csv(basepath / desc_fn, index_col=0)
         self.descriptions = descriptions["data_desc"].to_dict()
+        self.descriptions = {k: f"Patient description: {v}" for k, v in self.descriptions.items()}
 
     def __getitem__(self, idx):
         idx = idx * self.step_size
@@ -151,7 +166,7 @@ class ECGMITSegmentationDataset(ECGMITDataset):
         patient_id = self.clip_ids[idx]
         desc = self.descriptions[patient_id]
 
-        return {"x_enc": x, "labels": y, "descriptions": f"Patient description: {desc}"}
+        return {"x_enc": x, "labels": y, "descriptions": desc}
 
     def __len__(self):
         return (self.n_points - self.pred_len) // self.step_size + 1
