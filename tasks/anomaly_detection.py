@@ -33,8 +33,9 @@ class AnomalyDetectionTask(BaseTask):
             for inputs in tqdm(self.train_dataloader):
                 inputs = self.prepare_batch(inputs)
 
-                pred = self.model(inputs)
-                loss = self.loss_fn(pred, inputs["x_enc"].detach())
+                with torch.autocast(self.device.type, dtype=torch.bfloat16, enabled=self.mixed):
+                    pred = self.model(inputs)
+                    loss = self.loss_fn(pred, inputs["x_enc"].detach())
 
                 loss.backward()
                 self.optimizer.step()

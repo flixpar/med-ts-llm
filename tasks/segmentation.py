@@ -25,8 +25,9 @@ class SegmentationTask(BaseTask):
             for inputs in tqdm(self.train_dataloader):
                 inputs = self.prepare_batch(inputs)
 
-                pred = self.model(inputs)
-                loss = self.loss_fn(pred, inputs["labels"].to(self.dtype))
+                with torch.autocast(self.device.type, dtype=torch.bfloat16, enabled=self.mixed):
+                    pred = self.model(inputs)
+                    loss = self.loss_fn(pred, inputs["labels"].to(self.dtype))
 
                 loss.backward()
                 self.optimizer.step()

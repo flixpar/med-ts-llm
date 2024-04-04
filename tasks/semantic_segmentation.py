@@ -27,13 +27,14 @@ class SemanticSegmentationTask(BaseTask):
             for inputs in tqdm(self.train_dataloader):
                 inputs = self.prepare_batch(inputs)
 
-                pred = self.model(inputs)
-                if pred.ndim == 3:
-                    pred = pred.permute(0, 2, 1)
-                    labels = inputs["labels"]
-                else:
-                    labels = inputs["labels"].to(self.dtype)
-                loss = self.loss_fn(pred, labels)
+                with torch.autocast(self.device.type, dtype=torch.bfloat16, enabled=self.mixed):
+                    pred = self.model(inputs)
+                    if pred.ndim == 3:
+                        pred = pred.permute(0, 2, 1)
+                        labels = inputs["labels"]
+                    else:
+                        labels = inputs["labels"].to(self.dtype)
+                    loss = self.loss_fn(pred, labels)
 
                 loss.backward()
                 self.optimizer.step()

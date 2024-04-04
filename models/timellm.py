@@ -201,6 +201,7 @@ class TimeLLM(nn.Module):
             prompt = self.build_prompt(inputs)
             prompt = self.tokenizer(prompt, return_tensors="pt", padding=True, truncation=True, max_length=2048).input_ids
             prompt_embeddings = self.llm.get_input_embeddings()(prompt.to(x_enc.device)) # [bs, n_tok, d_llm]
+            prompt_embeddings = prompt_embeddings.to(enc_out.dtype)
 
             if self.covariate_mode == "independent":
                 prompt_embeddings = prompt_embeddings.repeat_interleave(n_features, dim=0)

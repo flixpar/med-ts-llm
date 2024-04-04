@@ -39,7 +39,7 @@ class BaseTask(ABC):
 
         self.model = self.build_model().to(self.device, self.dtype)
         self.optimizer = self.build_optimizer()
-        self.loss_fn = self.build_loss()
+        self.loss_fn = self.build_loss().to(device=self.device)
 
         self.epoch = 1
         self.step = 0
@@ -165,8 +165,9 @@ class BaseTask(ABC):
                 return torch.device(x)
 
     def get_dtype(self):
-        use_gpu = self.device.type == "cuda"
-        match self.config.setup.dtype, use_gpu:
+        self.use_gpu = self.device.type == "cuda"
+        self.mixed = (self.config.setup.dtype == "mixed")
+        match self.config.setup.dtype, self.use_gpu:
             case "bfloat16" | "bf16", True:
                 self.dtype = torch.bfloat16
             case "float16" | "half" | "fp16" | "16" | 16, _:
@@ -174,7 +175,7 @@ class BaseTask(ABC):
             case "float32" | "float" | "fp32" | "32" | 32, _:
                 self.dtype = torch.float32
             case "mixed", _:
-                raise NotImplementedError("Mixed precision training not yet implemented")
+                self.dtype = torch.float32
             case _:
                 raise ValueError(f"Invalid dtype selection: {self.config.setup.dtype}")
 
