@@ -112,7 +112,7 @@ class TimeLLM(nn.Module):
             cache_dir = cache_dir,
             trust_remote_code = True,
         )
-        if self.llm_layers > 0:
+        if self.llm_layers > 0 and self.llm_layers < llm_config.num_hidden_layers:
             llm_config.num_hidden_layers = self.llm_layers
         llm_config.output_hidden_states = True
 
@@ -139,11 +139,14 @@ class TimeLLM(nn.Module):
         else:
             quantization_config = None
 
+        attn_implmentation = "flash_attention_2" if ("mamba" not in self.llm_id) else "eager"
+
         llm = AutoModel.from_pretrained(
             self.llm_id,
             config = llm_config,
             quantization_config = quantization_config,
             torch_dtype = model_dtype,
+            attn_implementation = attn_implmentation,
             cache_dir = cache_dir,
             trust_remote_code = True,
             device_map = "auto",
