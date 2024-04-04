@@ -33,6 +33,7 @@ n_heads = 8
 d_ff = 32
 num_tokens = 1000
 covariate_mode = "add"    # options: univariate, concat, add, interleave, independent
+embedding_downsample_mode = "linear"   # options: linear, truncate, average
 
 [models.timellm.patching]
 patch_len = 16

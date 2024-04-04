@@ -84,6 +84,11 @@ class TimeLLM(nn.Module):
         self.reprogramming_layer = ReprogrammingLayer(self.d_model, self.n_attention_heads, self.d_ff, self.d_llm, attention_dropout=self.dropout)
         self.output_projection = FlattenHead(self.d_ff * self.n_patches, self.n_outputs, head_dropout=0)
 
+        self.embedding_downsample_mode = self.model_config.embedding_downsample_mode
+        if self.embedding_downsample_mode == "linear":
+            self.embedding_downsample_layer = nn.Linear(self.d_llm, self.d_ff)
+            self.embedding_downsample_mode = "truncate"
+
         if not self.llm_enabled:
             self.llm_replacement = nn.Sequential(
                 nn.Linear(self.d_llm, self.d_llm),
@@ -211,7 +216,19 @@ class TimeLLM(nn.Module):
         else:
             dec_out = self.llm_replacement(enc_out)
 
-        dec_out = dec_out[:, -self.n_patches:, :self.d_ff]
+        dec_out = dec_out[:, -self.n_patches:, :]
+        match self.embedding_downsample_mode:
+            case "truncate":
+                dec_out = dec_out[:, :, :self.d_ff]
+            case "linear":
+                dec_out = self.embedding_downsample_layer(dec_out)
+            case "average":
+                dec_out = dec_out.reshape(bs, self.n_patches, self.d_ff, -1)
+                dec_out = dec_out.mean(dim=-1)
+            case _:
+                raise ValueError(f"Unknown embedding downsample mode {self.embedding_downsample}")
+
+        # dec_out = dec_out[:, -self.n_patches:, :self.d_ff]
         dec_out = dec_out.permute(0, 2, 1).contiguous() # [bs, d_ff, n_patches]
         dec_out = self.output_projection(dec_out)       # [bs, pred_len * n_features]
 
