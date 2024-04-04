@@ -3,8 +3,8 @@ DEBUG = false
 task = "pretraining" # options: forecasting, anomaly_detection, semantic_segmentation, segmentation, pretraining
 model = "timellm"    # options: timellm, gpt4ts, dlinear, patchtst, fedformer, timesnet
 
-history_len = 96
-pred_len = 96
+history_len = 128
+pred_len = 128
 
 
 [data]
@@ -12,7 +12,7 @@ dataset = "all"
 mode = "multivariate"
 cols = "all"
 normalize = true
-step = 96
+step = 64
 
 
 [training]
@@ -36,10 +36,11 @@ n_features = 3
 
 [models.timellm]
 d_model = 32
-d_ff = 128
+d_ff = 64
 n_heads = 8
 num_tokens = 1000
-covariate_mode = "add"    # options: univariate, concat, add, interleave, independent
+covariate_mode = "add"                # options: univariate, concat, add, interleave, independent, independent-weighted
+embedding_downsample_mode = "linear"  # options: linear, truncate, average
 
 [models.timellm.patching]
 patch_len = 16
@@ -49,6 +50,7 @@ stride = 8
 enabled = true
 llm = "state-spaces/mamba-1.4b-hf"
 load_in_4bit = false
+load_in_8bit = false
 llm_layers = 36
 
 

@@ -1,54 +1,67 @@
 DEBUG = true
 
-task = "forecasting" # options: forecasting, anomaly_detection, imputation, classification
-model = "timellm"    # options: timellm, gpt4ts, dlinear
+task = "semantic_segmentation" # options: forecasting, anomaly_detection, semantic_segmentation, segmentation, pretraining
+model = "timellm"              # options: timellm, gpt4ts, dlinear, patchtst, fedformer, timesnet
 
-history_len = 96
-pred_len = 48
+history_len = 128
+pred_len = 128
 
 
 [data]
-dataset = "ECG"
+dataset = "ventilator"
 mode = "multivariate"
 cols = "all"
 normalize = true
-step = 24
+step = 640
 
 
 [training]
 epochs = 1
 batch_size = 16
 optimizer = "ranger"
-learning_rate = 0.001
+learning_rate = 1e-4
 dropout = 0.1
-loss = "mse"
+loss = "bce"
 
-eval_metric = "mse"
-eval_metric_direction = "min"
+eval_metric = "iou"
+eval_metric_direction = "max"
 
+
+[tasks.anomaly_detection]
+threshold = "optimize"
+score_metric = "mse"
+normalize_by_feature = true
+normalize_by_moving_avg = false
 
 [tasks.segmentation]
-mode = "boundary-prediction"
-# mode = "steps-to-boundary"
-distance_thresh = 300
+mode = "steps-to-boundary" # options: steps-to-boundary, boundary-prediction
+distance_thresh = "auto"   # options: auto, optimize, <int>
+
+[tasks.pretraining]
+tasks = ["forecasting"]
+datasets = "all"
+downsample_pct = 0.01
+n_features = 3
 
 
 [models.timellm]
 d_model = 16
-n_heads = 8
 d_ff = 32
+n_heads = 8
 num_tokens = 1000
-covariate_mode = "add"    # options: univariate, concat, add, interleave, independent
+covariate_mode = "add"                # options: univariate, concat, add, interleave, independent, independent-weighted
+embedding_downsample_mode = "linear"  # options: linear, truncate, average
 
 [models.timellm.patching]
 patch_len = 16
 stride = 8
 
 [models.timellm.llm]
-enabled = false
+enabled = true
 llm = "state-spaces/mamba-1.4b-hf"
 load_in_4bit = false
-llm_layers = 2
+load_in_8bit = false
+llm_layers = 4
 
 
 [models.gpt4ts]
@@ -67,9 +80,43 @@ moving_avg = 25
 individual = false
 
 
+[models.patchtst]
+e_layers = 3
+d_model = 128
+d_ff = 256
+n_heads = 8
+covariate_mode = "independent"
+
+[models.patchtst.patching]
+patch_len = 16
+stride = 8
+
+
+[models.fedformer]
+d_model = 128
+d_ff = 256
+n_heads = 8
+version = "fourier"
+mode_select = "random"
+modes = 32
+moving_avg = 25
+activation = "gelu"
+e_layers = 2
+d_layers = 1
+label_len = 0
+
+
+[models.timesnet]
+e_layers = 3
+d_model = 32
+d_ff = 32
+num_kernels = 6
+top_k = 3
+
+
 [setup]
 seed = 0
 device = "auto"
 dtype = "bf16"
-num_workers = 0
-logger = "tensorboard"
+num_workers = "auto"
+logger = "print"

@@ -1,10 +1,10 @@
 DEBUG = false
 
-task = "semantic_segmentation" # options: forecasting, anomaly_detection, imputation, classification
-model = "timellm"    # options: timellm, gpt4ts, dlinear
+task = "semantic_segmentation" # options: forecasting, anomaly_detection, semantic_segmentation, segmentation, pretraining
+model = "timellm"              # options: timellm, gpt4ts, dlinear, patchtst, fedformer, timesnet
 
-history_len = 96
-pred_len = 96
+history_len = 256
+pred_len = 256
 
 
 [data]
@@ -12,27 +12,27 @@ dataset = "ventilator"
 mode = "multivariate"
 cols = "all"
 normalize = true
-step = 8
+step = 128
 
 
 [training]
 epochs = 10
 batch_size = 16
 optimizer = "ranger"
-learning_rate = 0.001
+learning_rate = 1e-4
 dropout = 0.1
 loss = "bce"
 
-eval_metric = "f1"
+eval_metric = "iou"
 eval_metric_direction = "max"
 
 
 [models.timellm]
-d_model = 16
+d_model = 32
+d_ff = 64
 n_heads = 8
-d_ff = 32
 num_tokens = 1000
-covariate_mode = "add"    # options: univariate, concat, add, interleave, independent
+covariate_mode = "add"                 # options: univariate, concat, add, interleave, independent, independent-weighted
 embedding_downsample_mode = "linear"   # options: linear, truncate, average
 
 [models.timellm.patching]
@@ -43,6 +43,7 @@ stride = 8
 enabled = true
 llm = "state-spaces/mamba-1.4b-hf"
 load_in_4bit = false
+load_in_8bit = false
 llm_layers = 36
 
 
@@ -60,6 +61,40 @@ stride = 1
 [models.dlinear]
 moving_avg = 25
 individual = false
+
+
+[models.patchtst]
+e_layers = 3
+d_model = 128
+d_ff = 256
+n_heads = 8
+covariate_mode = "independent"
+
+[models.patchtst.patching]
+patch_len = 16
+stride = 8
+
+
+[models.fedformer]
+d_model = 128
+d_ff = 256
+n_heads = 8
+version = "fourier"
+mode_select = "random"
+modes = 32
+moving_avg = 25
+activation = "gelu"
+e_layers = 2
+d_layers = 1
+label_len = 48
+
+
+[models.timesnet]
+e_layers = 3
+d_model = 32
+d_ff = 32
+num_kernels = 6
+top_k = 3
 
 
 [setup]
