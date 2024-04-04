@@ -20,9 +20,9 @@ class WandBLogger(BaseLogger):
             job_type = "training",
             mode = "online" if not self.config.DEBUG else "disabled",
         )
+        self.logger.log_code()
 
     def log_end(self):
-        self.logger.log_code()
         self.logger.finish()
 
     def log_scores(self, scores={}, **kwscores):
