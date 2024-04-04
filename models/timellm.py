@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 import transformers
 from transformers import AutoConfig, AutoModel, AutoTokenizer
+from transformers import BitsAndBytesConfig
 transformers.logging.set_verbosity_error()
 
 from .layers.embed import PatchEmbedding
@@ -110,12 +111,37 @@ class TimeLLM(nn.Module):
             llm_config.num_hidden_layers = self.llm_layers
         llm_config.output_hidden_states = True
 
+        match self.config.setup.dtype:
+            case "bfloat16" | "bf16":
+                model_dtype = torch.bfloat16
+            case "float16" | "half" | "fp16" | "16" | 16:
+                model_dtype = torch.float16
+            case "float32" | "float" | "fp32" | "32" | 32 | "mixed":
+                model_dtype = torch.float32
+            case x:
+                raise ValueError(f"Invalid dtype selection: {x}")
+
+        if self.model_config.llm.load_in_4bit or self.model_config.llm.load_in_8bit:
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit = self.model_config.llm.load_in_4bit,
+                load_in_8bit = self.model_config.llm.load_in_8bit,
+
+                llm_int8_has_fp16_weight = True,
+                llm_int8_skip_modules = ["mamba"],
+
+                bnb_4bit_compute_dtype = model_dtype,
+            )
+        else:
+            quantization_config = None
+
         llm = AutoModel.from_pretrained(
             self.llm_id,
             config = llm_config,
-            load_in_4bit = self.model_config.llm.load_in_4bit,
+            quantization_config = quantization_config,
+            torch_dtype = model_dtype,
             cache_dir = cache_dir,
             trust_remote_code = True,
+            device_map = "auto",
         )
 
         tokenizer = AutoTokenizer.from_pretrained(
