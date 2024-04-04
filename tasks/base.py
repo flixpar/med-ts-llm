@@ -43,7 +43,9 @@ class BaseTask(ABC):
 
         self.epoch = 1
         self.step = 0
-        self.best_score = float("inf")
+
+        metric_dir = self.config.training.eval_metric_direction
+        self.best_score = float("inf") if (metric_dir == "min") else float("-inf")
 
         self.logger = get_logger(self, self.config, self.newrun)
 
@@ -145,8 +147,10 @@ class BaseTask(ABC):
         self.logger.save_state("latest")
 
         metric = "val/" + self.config.training.eval_metric
-        metric_min = self.config.training.eval_metric_direction == "min"
-        if (metric_min and (scores[metric] < self.best_score)) or (not metric_min and (scores[metric] > self.best_score)):
+        metric_dir = self.config.training.eval_metric_direction
+        if ((metric_dir == "min") and (scores[metric] < self.best_score)) or (
+            (metric_dir == "max") and (scores[metric] > self.best_score)
+        ):
             self.best_score = scores[metric]
             self.logger.save_state("best")
 
