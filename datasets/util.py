@@ -7,41 +7,58 @@ import torch
 from torch.utils.data import Dataset
 
 
-class Multi2UniDataset(Dataset):
-    def __init__(self, dataset):
-        self.dataset = dataset
-        self.__dict__.update(dataset.__dict__)
-        self.real_features = dataset.n_features
-        self.n_features = 1
+def multi_2_uni_dataset(dataset_cls):
+    class Multi2UniDataset(dataset_cls):
 
-    def __getitem__(self, index):
-        example_idx = index // self.real_features
-        feature_idx = index % self.real_features
+        @property
+        def n_features(self):
+            return 1
 
-        inputs = self.dataset[example_idx]
+        @property
+        def real_features(self):
+            return super().n_features
 
-        inputs["x_enc"] = inputs["x_enc"][:, feature_idx:(feature_idx+1)]
-        if "y" in inputs:
-            inputs["y"] = inputs["y"][:, feature_idx:(feature_idx+1)]
-        if "x_dec" in inputs:
-            inputs["x_dec"] = inputs["x_dec"][:, feature_idx:(feature_idx+1)]
+        def __getitem__(self, index):
+            example_idx = index // self.real_features
+            feature_idx = index % self.real_features
+            inputs = super().__getitem__(example_idx)
 
-        return inputs
+            inputs["x_enc"] = inputs["x_enc"][:, feature_idx:(feature_idx+1)]
+            if "y" in inputs:
+                inputs["y"] = inputs["y"][:, feature_idx:(feature_idx+1)]
+            if "x_dec" in inputs:
+                inputs["x_dec"] = inputs["x_dec"][:, feature_idx:(feature_idx+1)]
 
-    def __len__(self):
-        return len(self.dataset) * self.real_features
+            return inputs
 
-    def inverse_index(self, index):
-        example_idx = self.dataset.inverse_index(index // self.real_features)
-        feature_idx = index % self.real_features
-        return example_idx, feature_idx
+        def __len__(self):
+            return super().__len__() * self.real_features
+
+        def inverse_index(self, index):
+            example_idx = super().inverse_index(index // self.real_features)
+            feature_idx = index % self.real_features
+            return example_idx, feature_idx
+
+    return Multi2UniDataset
 
 
 class PretrainingDataset(Dataset):
 
+    supported_tasks = ["pretraining"]
+    description = "This dataset consists of a mix of different biomedical time series datasets."
+
     def __init__(self, datasets, downsample_pct=1.0, n_features=None):
         self.datasets = list(datasets.values())
         self.dataset_names = list(datasets.keys())
+
+        self.config = self.datasets[0].config
+        self.split = self.datasets[0].split
+        self.task = "pretraining"
+        self.name = "pretrain:" + "+".join(self.dataset_names)
+
+        self.task_config = self.config.get("tasks", {}).get(self.task, {})
+        self.dataset_config = {}
+        self.data_config = self.config.data
 
         inds_subset = lambda dataset: torch.randperm(len(dataset))[:max(1, int(downsample_pct * len(dataset)))]
         self.dataset_inds = [inds_subset(dataset) for dataset in self.datasets]
@@ -52,13 +69,13 @@ class PretrainingDataset(Dataset):
         if n_features is None or n_features == "auto":
             n_features = max(dataset.n_features for dataset in self.datasets)
         self.n_features = n_features
+        self.real_features = n_features
+        self.n_classes = 0
 
         self.pred_len = self.datasets[0].pred_len
         self.history_len = self.datasets[0].history_len
         self.step_size = self.history_len + self.pred_len
         self.n_points = sum(self.step_size * l for l in self.lens)
-
-        self.description = "This dataset consists of a mix of different biomedical time series datasets."
 
     def __getitem__(self, index):
         dataset_idx = bisect.bisect_right(self.cumsums, index) - 1

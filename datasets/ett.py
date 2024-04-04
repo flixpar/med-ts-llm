@@ -1,68 +1,43 @@
+from abc import ABC
 from pathlib import Path
-
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
 
-from torch.utils.data import Dataset
+from .base import BaseDataset, ForecastDataset
 
 
-class ETTDataset(Dataset):
-    def __init__(self, config, split):
-        assert config.data.cols == "all"
+class ETTDataset(BaseDataset, ABC):
 
-        self.split = split
-        self.task = config.task
-        self.history_len = config.history_len
-        self.pred_len = config.pred_len
-        self.step_size = config.data.step
+    supported_tasks = ["forecasting"]
+    description = "The Electricity Transformer Temperature (ETT) is a crucial indicator in the electric power long-term deployment."
+
+    def get_data(self, split=None):
+        split = split or self.split
 
         basepath = Path(__file__).parent / "../data/ett/"
-        datapath = basepath / (config.data.dataset + ".csv")
+        datapath = basepath / (self.config.data.dataset + ".csv")
         data = pd.read_csv(datapath, parse_dates=["date"], index_col="date")
 
         train_range = (0, 12 * 30 * 24)
         val_range = (train_range[1], train_range[1] + 4 * 30 * 24)
         test_range = (val_range[1], val_range[1] + 4 * 30 * 24)
 
-        train = data.iloc[slice(*train_range)].values
-        val = data.iloc[slice(*val_range)].values
-        test = data.iloc[slice(*test_range)].values
-
         match split:
             case "train":
-                self.data = train
+                data = data.iloc[slice(*train_range)].values
             case "val":
-                self.data = val
+                data = data.iloc[slice(*val_range)].values
             case "test":
-                self.data = test
-                self.step_size = self.pred_len
+                data = data.iloc[slice(*test_range)].values
             case _:
                 raise ValueError(f"Invalid split: {split}")
 
-        if config.data.normalize:
-            self.normalizer = StandardScaler()
-            self.data = self.normalizer.fit_transform(self.data)
+        return {"data": data}
 
-        self.n_points = self.data.shape[0]
-        self.n_features = self.data.shape[1]
-        self.mode = "multivariate"
 
-        self.description = "The Electricity Transformer Temperature (ETT) is a crucial indicator in the electric power long-term deployment."
+class ETTForecastDataset(ETTDataset, ForecastDataset):
+    pass
 
-        self.supported_tasks = ["forecasting"]
 
-    def __len__(self):
-        return (self.n_points - self.history_len - self.pred_len + 1) // self.step_size
-
-    def __getitem__(self, idx):
-        idx = idx * self.step_size
-        x_range = (idx, idx + self.history_len)
-        y_range = (x_range[1], x_range[1] + self.pred_len)
-
-        x = self.data[slice(*x_range),:]
-        y = self.data[slice(*y_range),:]
-
-        return {"x_enc": x, "y": y}
-
-    def inverse_index(self, idx):
-        return idx * self.step_size + self.history_len
+ett_datasets = {
+    "forecasting": ETTForecastDataset,
+}

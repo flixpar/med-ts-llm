@@ -1,29 +1,19 @@
 from abc import ABC
 from pathlib import Path
 
-import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
+import pandas as pd
 
-from torch.utils.data import Dataset
+from .base import BaseDataset, ForecastDataset, SemanticSegmentationDataset
 
 
-class LUDBDataset(Dataset, ABC):
+class LUDBDataset(BaseDataset, ABC):
 
     supported_tasks = ["forecasting", "semantic_segmentation"]
+    description = "LUDB is an ECG signal database with marked boundaries and peaks of P, T waves and QRS complexes. Cardiologists manually annotated all 200 records of healthy and sick patients which contains a corresponding diagnosis. This can be used for ECG delineation."
 
-    def __init__(self, config, split):
-        assert config.data.cols == "all"
-        assert config.task in self.supported_tasks
-
-        self.split = split
-        self.task = config.task
-        self.history_len = config.history_len
-        self.pred_len = config.pred_len
-        self.step_size = config.data.step
-
-        if self.split == "test":
-            self.step_size = self.pred_len
+    def get_data(self, split=None):
+        split = split or self.split
 
         basepath = Path(__file__).parent / "../data/ludb/"
         split_fn = "train.csv" if split == "train" else "test.csv"
@@ -31,52 +21,21 @@ class LUDBDataset(Dataset, ABC):
 
         desc_fn = "train_data_desc.csv" if split == "train" else "test_data_desc.csv"
         descriptions = pd.read_csv(basepath / desc_fn, index_col=0)
-        self.descriptions = descriptions["data_desc"].to_dict()
+        descriptions = descriptions["data_desc"].to_dict()
 
-        self.data = data["ecg"].values[:,np.newaxis]
-        self.labels = data["label"].values.astype(int)
-        self.patient_ids = data["patient_id"].values.astype(int)
+        features = data["ecg"].values[:,np.newaxis]
+        labels = data["label"].values.astype(int)
+        clip_ids = data["patient_id"].values.astype(int)
 
-        if config.data.normalize:
-            train_data = self.data if split == "train" else pd.read_csv(basepath / "train.csv", usecols=["ecg"]).values
-            self.normalizer = StandardScaler().fit(train_data)
-            self.data = self.normalizer.transform(self.data)
-
-        self.n_points, self.n_features = self.data.shape
-        self.n_classes = len(np.unique(self.labels))
-        self.mode = "multivariate"
-
-        self.description = "LUDB is an ECG signal database with marked boundaries and peaks of P, T waves and QRS complexes. Cardiologists manually annotated all 200 records of healthy and sick patients which contains a corresponding diagnosis. This can be used for ECG delineation."
+        return {"data": features, "labels": labels, "clip_ids": clip_ids, "clip_descriptions": descriptions}
 
 
-class LUDBForecastingDataset(LUDBDataset):
-    def __init__(self, config, split):
-        super(LUDBForecastingDataset, self).__init__(config, split)
-        assert self.task == "forecasting"
 
-    def __getitem__(self, idx):
-        idx = idx * self.step_size
-        x_range = (idx, idx + self.history_len)
-        y_range = (x_range[1], x_range[1] + self.pred_len)
-
-        x = self.data[slice(*x_range),:]
-        y = self.data[slice(*y_range),:]
-
-        return {"x_enc": x, "y": y}
-
-    def __len__(self):
-        return (self.n_points - self.history_len - self.pred_len + 1) // self.step_size
-
-    def inverse_index(self, idx):
-        return idx * self.step_size + self.history_len
+class LUDBForecastingDataset(LUDBDataset, ForecastDataset):
+    pass
 
 
-class LUDBSemanticSegmentationDataset(LUDBDataset):
-    def __init__(self, config, split):
-        super(LUDBSemanticSegmentationDataset, self).__init__(config, split)
-        assert self.task == "semantic_segmentation"
-        assert self.pred_len == self.history_len
-
+class LUDBSemanticSegmentationDataset(LUDBDataset, SemanticSegmentationDataset):
     def __getitem__(self, idx):
         idx = idx * self.step_size
         idx_range = (idx, idx + self.pred_len)
@@ -89,17 +48,8 @@ class LUDBSemanticSegmentationDataset(LUDBDataset):
 
         return {"x_enc": x, "labels": y, "descriptions": f"Patient description: {desc}"}
 
-    def __len__(self):
-        return (self.n_points - self.pred_len) // self.step_size + 1
 
-    def inverse_index(self, idx):
-        return idx * self.step_size
-
-
-def LUDBDatasetSelector(config, split):
-    if config.task == "forecasting":
-        return LUDBForecastingDataset(config, split)
-    elif config.task == "semantic_segmentation":
-        return LUDBSemanticSegmentationDataset(config, split)
-    else:
-        raise ValueError(f"Task {config.task} not supported by dataset {config.data.dataset}")
+ludb_datasets = {
+    "forecasting": LUDBForecastingDataset,
+    "semantic_segmentation": LUDBSemanticSegmentationDataset,
+}

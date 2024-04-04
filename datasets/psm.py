@@ -3,110 +3,46 @@ from pathlib import Path
 
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
 
-from torch.utils.data import Dataset
+from .base import BaseDataset, ForecastDataset, AnomalyDetectionDataset
 
 
-class PSMDataset(Dataset, ABC):
-    def __init__(self, config, split):
-        assert config.data.cols == "all"
+class PSMDataset(BaseDataset, ABC):
 
-        self.split = split
-        self.task = config.task
-        self.history_len = config.history_len
-        self.pred_len = config.pred_len
-        self.step_size = config.data.step
+    supported_tasks = ["forecasting", "anomaly_detection"]
+    description = "The PSM dataset is proposed by eBay and consists of 26 dimensional data captured internally from application server nodes. The dataset is used to predict the number of sessions in the next 10 minutes based on the current and historical data."
 
-        if self.split == "test":
-            self.step_size = self.pred_len
-
+    def get_data(self, split=None):
+        split = split or self.split
         basepath = Path(__file__).parent / "../data/psm/"
         split_fn = "train.csv" if split == "train" else "test.csv"
         data = pd.read_csv(basepath / split_fn)
         data = data.drop(columns=["timestamp_(min)"])
-
-        self.data = np.nan_to_num(data.values)
-
-        if config.data.normalize:
-            if split == "train":
-                train_data = self.data
-            else:
-                train_data = pd.read_csv(basepath / "train.csv")
-                train_data = train_data.drop(columns=["timestamp_(min)"])
-                train_data = np.nan_to_num(train_data.values)
-
-            self.normalizer = StandardScaler().fit(train_data)
-            self.data = self.normalizer.transform(self.data)
-
-        self.n_points = self.data.shape[0]
-        self.n_features = self.data.shape[1]
-        self.mode = "multivariate"
-
-        self.description = "The PSM dataset is proposed by eBay and consists of 26 dimensional data captured internally from application server nodes. The dataset is used to predict the number of sessions in the next 10 minutes based on the current and historical data."
-
-        self.supported_tasks = ["forecasting", "anomaly_detection"]
-        assert self.task in self.supported_tasks
+        data = np.nan_to_num(data.values)
+        return {"data": data}
 
 
-class PSMForecastingDataset(PSMDataset):
-    def __init__(self, config, split):
-        super(PSMForecastingDataset, self).__init__(config, split)
-        assert self.task == "forecasting"
-
-    def __getitem__(self, idx):
-        idx = idx * self.step_size
-        x_range = (idx, idx + self.history_len)
-        y_range = (x_range[1], x_range[1] + self.pred_len)
-
-        x = self.data[slice(*x_range),:]
-        y = self.data[slice(*y_range),:]
-
-        return {"x_enc": x, "y": y}
-
-    def __len__(self):
-        return (self.n_points - self.history_len - self.pred_len + 1) // self.step_size
-
-    def inverse_index(self, idx):
-        return idx * self.step_size + self.history_len
+class PSMForecastingDataset(PSMDataset, ForecastDataset):
+    pass
 
 
-class PSMAnomalyDetectionDataset(PSMDataset):
-    def __init__(self, config, split):
-        super(PSMAnomalyDetectionDataset, self).__init__(config, split)
-        assert self.task == "anomaly_detection"
+class PSMAnomalyDetectionDataset(PSMDataset, AnomalyDetectionDataset):
+    def get_data(self, split=None):
+        split = split or self.split
+        data = super().get_data(split)
 
         if self.split != "train":
             basepath = Path(__file__).parent / "../data/psm/"
             labels = pd.read_csv(basepath / "test_label.csv")
             labels = labels.drop(columns=["timestamp_(min)"])
-            self.labels = labels.values[:,0].astype(int)
+            labels = labels.values[:,0].astype(int)
         else:
-            self.labels = None
+            labels = None
 
-    def __getitem__(self, idx):
-        idx = idx * self.step_size
-        x_range = (idx, idx + self.pred_len)
-        x = self.data[slice(*x_range),:]
-
-        if self.labels is not None:
-            labels = self.labels[slice(*x_range)]
-        else:
-            labels = x[0:0,0]
-
-        return {"x_enc": x, "labels": labels}
-
-    def __len__(self):
-        return (self.n_points - self.pred_len) // self.step_size + 1
-
-    def inverse_index(self, idx):
-        return idx * self.step_size
+        return data | {"labels": labels}
 
 
-def PSMDatasetSelector(config, split):
-    if config.task == "forecasting":
-        return PSMForecastingDataset(config, split)
-    elif config.task == "anomaly_detection":
-        return PSMAnomalyDetectionDataset(config, split)
-    else:
-        raise ValueError(f"Task {config.task} not supported by dataset {config.data.dataset}")
+psm_datasets = {
+    "forecasting": PSMForecastingDataset,
+    "anomaly_detection": PSMAnomalyDetectionDataset,
+}
