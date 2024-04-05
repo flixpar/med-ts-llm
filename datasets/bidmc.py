@@ -2,12 +2,12 @@ from abc import ABC
 from pathlib import Path
 import pandas as pd
 
-from .base import BaseDataset, ForecastDataset, SegmentationDataset
+from .base import BaseDataset, ForecastDataset, ReconstructionDataset, SegmentationDataset
 
 
 class BIDMCDataset(BaseDataset, ABC):
 
-    supported_tasks = ["forecasting", "segmentation"]
+    supported_tasks = ["forecasting", "reconstruction", "segmentation"]
 
     description = "The BIDMC dataset is a dataset of electrocardiogram (ECG), pulse oximetry (photoplethysmogram, PPG) and impedance pneumography respiratory signals acquired from intensive care patients. Two annotators manually annotated individual breaths in each recording using the impedance respiratory signal."
 
@@ -34,11 +34,15 @@ class BIDMCDataset(BaseDataset, ABC):
 class BIDMCForecastingDataset(BIDMCDataset, ForecastDataset):
     pass
 
+class BIDMCReconstructionDataset(BIDMCDataset, ReconstructionDataset):
+    pass
+
 class BIDMCSegmentationDataset(BIDMCDataset, SegmentationDataset):
     pass
 
 
 bidmc_datasets = {
     "forecasting": BIDMCForecastingDataset,
+    "reconstruction": BIDMCReconstructionDataset,
     "segmentation": BIDMCSegmentationDataset,
 }

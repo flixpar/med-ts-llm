@@ -18,7 +18,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 class TimeLLM(nn.Module):
 
-    supported_tasks = ["forecasting", "anomaly_detection", "semantic_segmentation", "segmentation", "pretraining"]
+    supported_tasks = ["forecasting", "reconstruction", "anomaly_detection", "semantic_segmentation", "segmentation", "pretraining"]
     supported_modes = ["univariate", "multivariate"]
 
     def __init__(self, config, dataset):
@@ -50,7 +50,7 @@ class TimeLLM(nn.Module):
 
         self.n_classes = dataset.n_classes if self.task in ["classification", "semantic_segmentation"] else 0
 
-        if self.task in ["forecasting", "anomaly_detection", "pretraining"]:
+        if self.task in ["forecasting", "reconstruction", "anomaly_detection", "pretraining"]:
             self.n_outputs_per_step = self.n_features
         elif self.task == "semantic_segmentation":
             self.n_outputs_per_step = self.n_classes if self.n_classes > 2 else 1
@@ -272,7 +272,7 @@ class TimeLLM(nn.Module):
         else:
             dec_out = dec_out.view(bs, self.pred_len, self.n_outputs_per_step)
 
-        if self.task in ["forecasting", "anomaly_detection"]:
+        if self.task in ["forecasting", "reconstruction", "anomaly_detection", "pretraining"]:
             dec_out = self.normalize_layers(dec_out, "denorm")
         else:
             dec_out = dec_out.squeeze(-1)
@@ -320,7 +320,7 @@ class TimeLLM(nn.Module):
     def get_task_description(self):
         if self.task == "forecasting" or self.task == "pretraining":
             self.task_description = f"Forecast the next {self.pred_len} steps given the previous {self.seq_len} steps of data."
-        elif self.task == "anomaly_detection":
+        elif self.task == "anomaly_detection" or self.task == "reconstruction":
             self.task_description = f"Reconstruct the past {self.seq_len} steps of data as accurately as possible using the following information."
         elif self.task == "semantic_segmentation":
             self.task_description = f"Classify the past {self.seq_len} steps of data as accurately as possible using the following information."

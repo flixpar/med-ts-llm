@@ -2,12 +2,12 @@ from abc import ABC
 from pathlib import Path
 import numpy as np
 
-from .base import BaseDataset, ForecastDataset, AnomalyDetectionDataset
+from .base import BaseDataset, ForecastDataset, ReconstructionDataset, AnomalyDetectionDataset
 
 
 class MSLDataset(BaseDataset, ABC):
 
-    supported_tasks = ["forecasting", "anomaly_detection"]
+    supported_tasks = ["forecasting", "reconstruction", "anomaly_detection"]
     description = "The MSL (Mars Science Laboratory rover) dataset was created by NASA and consists of telemetry data across 55 sensors on the rover. The data is collected at 1 minute intervals and spans a period of 78 Martian days. The dataset is labeled with 143 anomalous intervals, each of which is labeled by an expert as an incident, surprise, or an anomaly."
 
     def get_data(self, split=None):
@@ -19,6 +19,10 @@ class MSLDataset(BaseDataset, ABC):
 
 
 class MSLForecastingDataset(MSLDataset, ForecastDataset):
+    pass
+
+
+class MSLReconstructionDataset(MSLDataset, ReconstructionDataset):
     pass
 
 
@@ -39,5 +43,6 @@ class MSLAnomalyDetectionDataset(MSLDataset, AnomalyDetectionDataset):
 
 msl_datasets = {
     "forecasting": MSLForecastingDataset,
+    "reconstruction": MSLReconstructionDataset,
     "anomaly_detection": MSLAnomalyDetectionDataset,
 }

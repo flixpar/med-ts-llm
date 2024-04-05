@@ -8,7 +8,7 @@ class DLinear(nn.Module):
     Paper link: https://arxiv.org/pdf/2205.13504.pdf
     """
 
-    supported_tasks = ["forecasting", "anomaly_detection", "imputation", "classification", "semantic_segmentation", "segmentation"]
+    supported_tasks = ["forecasting", "anomaly_detection", "reconstruction", "imputation", "classification", "semantic_segmentation", "segmentation"]
     supported_modes = ["multivariate"]
 
     def __init__(self, config, dataset):
@@ -21,10 +21,10 @@ class DLinear(nn.Module):
         self.decompsition = series_decomp(config.models.dlinear.moving_avg)
 
         self.seq_len = config.history_len
-        if self.task_name in ["classification", "anomaly_detection", "imputation", "semantic_segmentation", "segmentation"]:
-            self.pred_len = self.seq_len
-        else:
+        if self.task_name == "forecasting":
             self.pred_len = config.pred_len
+        else:
+            self.pred_len = self.seq_len
 
         if self.task_name in ["classification", "semantic_segmentation"]:
             self.n_classes = dataset.n_classes
@@ -119,7 +119,7 @@ class DLinear(nn.Module):
         elif self.task_name == "imputation":
             dec_out = self.imputation(x_enc)
             return dec_out  # [B, L, D]
-        elif self.task_name == "anomaly_detection":
+        elif self.task_name == "anomaly_detection" or self.task_name == "reconstruction":
             dec_out = self.anomaly_detection(x_enc)
             return dec_out  # [B, L, D]
         elif self.task_name == "classification":

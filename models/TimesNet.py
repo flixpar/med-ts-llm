@@ -13,6 +13,7 @@ class TimesNet(nn.Module):
 
     supported_tasks = [
         "forecasting",
+        "reconstruction",
         "anomaly_detection",
         "imputation",
         "classification",
@@ -65,7 +66,7 @@ class TimesNet(nn.Module):
             self.projection = nn.Linear(
                 self.model_config.d_model, self.c_out, bias=True
             )
-        if self.task_name == "imputation" or self.task_name == "anomaly_detection":
+        if self.task_name in ["imputation", "reconstruction", "anomaly_detection"]:
             self.projection = nn.Linear(
                 self.model_config.d_model, self.c_out, bias=True
             )
@@ -238,7 +239,7 @@ class TimesNet(nn.Module):
         if self.task_name == "imputation":
             dec_out = self.imputation(x_enc, x_mark_enc, x_dec, x_mark_dec, mask)
             return dec_out  # [B, L, D]
-        if self.task_name == "anomaly_detection":
+        if self.task_name == "anomaly_detection" or self.task_name == "reconstruction":
             dec_out = self.anomaly_detection(x_enc)
             return dec_out  # [B, L, D]
         if self.task_name == "classification":

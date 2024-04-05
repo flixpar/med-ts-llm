@@ -2,12 +2,12 @@ from abc import ABC
 from pathlib import Path
 import pandas as pd
 
-from .base import BaseDataset, ForecastDataset
+from .base import BaseDataset, ForecastDataset, ReconstructionDataset
 
 
 class ETTDataset(BaseDataset, ABC):
 
-    supported_tasks = ["forecasting"]
+    supported_tasks = ["forecasting", "reconstruction"]
     description = "The Electricity Transformer Temperature (ETT) is a crucial indicator in the electric power long-term deployment."
 
     def get_data(self, split=None):
@@ -38,6 +38,11 @@ class ETTForecastDataset(ETTDataset, ForecastDataset):
     pass
 
 
+class ETTReconstructionDataset(ETTDataset, ReconstructionDataset):
+    pass
+
+
 ett_datasets = {
     "forecasting": ETTForecastDataset,
+    "reconstruction": ETTReconstructionDataset,
 }

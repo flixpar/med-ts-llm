@@ -24,6 +24,7 @@ class FEDformer(nn.Module):
     supported_tasks = [
         "forecasting",
         "anomaly_detection",
+        "reconstruction",
         "imputation",
         "classification",
         "semantic_segmentation",
@@ -170,7 +171,7 @@ class FEDformer(nn.Module):
             self.projection = nn.Linear(
                 self.d_model, self.c_out, bias=True
             )
-        if self.task_name == "anomaly_detection":
+        if self.task_name == "anomaly_detection" or self.task_name == "reconstruction":
             self.projection = nn.Linear(
                 self.d_model, self.c_out, bias=True
             )
@@ -290,7 +291,7 @@ class FEDformer(nn.Module):
         if self.task_name == "imputation":
             dec_out = self.imputation(x_enc, x_mark_enc, x_dec, x_mark_dec, mask)
             return dec_out  # [B, L, D]
-        if self.task_name == "anomaly_detection":
+        if self.task_name == "anomaly_detection" or self.task_name == "reconstruction":
             dec_out = self.anomaly_detection(x_enc)
             return dec_out  # [B, L, D]
         if self.task_name == "classification":

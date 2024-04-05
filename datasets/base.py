@@ -132,6 +132,26 @@ class ForecastDataset(BaseDataset, ABC):
         return (idx * self.step_size) + self.history_len
 
 
+class ReconstructionDataset(BaseDataset, ABC):
+
+    def __init__(self, config, split):
+        super().__init__(config, split)
+        assert self.task == "reconstruction"
+        assert self.pred_len == self.history_len
+
+    def __getitem__(self, idx):
+        idx = idx * self.step_size
+        x_range = (idx, idx + self.pred_len)
+        x = self.data[slice(*x_range),:]
+        return {"x_enc": x}
+
+    def __len__(self):
+        return (self.n_points - self.pred_len) // self.step_size + 1
+
+    def inverse_index(self, idx):
+        return idx * self.step_size
+
+
 class AnomalyDetectionDataset(BaseDataset, ABC):
 
     def __init__(self, config, split):

@@ -4,12 +4,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .base import BaseDataset, ForecastDataset, SemanticSegmentationDataset
+from .base import BaseDataset, ForecastDataset, ReconstructionDataset, SemanticSegmentationDataset
 
 
 class LUDBDataset(BaseDataset, ABC):
 
-    supported_tasks = ["forecasting", "semantic_segmentation"]
+    supported_tasks = ["forecasting", "reconstruction", "semantic_segmentation"]
     description = "LUDB is an ECG signal database with marked boundaries and peaks of P, T waves and QRS complexes. Cardiologists manually annotated all 200 records of healthy and sick patients which contains a corresponding diagnosis. This can be used for ECG delineation."
 
     def get_data(self, split=None):
@@ -35,6 +35,10 @@ class LUDBForecastingDataset(LUDBDataset, ForecastDataset):
     pass
 
 
+class LUDBReconstructionDataset(LUDBDataset, ReconstructionDataset):
+    pass
+
+
 class LUDBSemanticSegmentationDataset(LUDBDataset, SemanticSegmentationDataset):
     def __getitem__(self, idx):
         idx = idx * self.step_size
@@ -51,5 +55,6 @@ class LUDBSemanticSegmentationDataset(LUDBDataset, SemanticSegmentationDataset):
 
 ludb_datasets = {
     "forecasting": LUDBForecastingDataset,
+    "reconstruction": LUDBReconstructionDataset,
     "semantic_segmentation": LUDBSemanticSegmentationDataset,
 }

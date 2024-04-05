@@ -13,6 +13,7 @@ class PatchTST(nn.Module):
 
     supported_tasks = [
         "forecasting",
+        "reconstruction",
         "anomaly_detection",
         "imputation",
         "classification",
@@ -101,7 +102,7 @@ class PatchTST(nn.Module):
                 self.pred_len,
                 head_dropout=self.dropout,
             )
-        elif self.task_name == "imputation" or self.task_name == "anomaly_detection":
+        elif self.task_name in ["imputation", "reconstruction", "anomaly_detection"]:
             self.head = FlattenHead(
                 self.enc_in,
                 self.head_nf,
@@ -329,7 +330,7 @@ class PatchTST(nn.Module):
         if self.task_name == "imputation":
             dec_out = self.imputation(x_enc, x_mark_enc, x_dec, x_mark_dec, mask)
             return dec_out  # [B, L, D]
-        if self.task_name == "anomaly_detection":
+        if self.task_name == "anomaly_detection" or self.task_name == "reconstruction":
             dec_out = self.anomaly_detection(x_enc)
             return dec_out  # [B, L, D]
         if self.task_name == "classification":

@@ -4,12 +4,12 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-from .base import BaseDataset, ForecastDataset, AnomalyDetectionDataset
+from .base import BaseDataset, ForecastDataset, ReconstructionDataset, AnomalyDetectionDataset
 
 
 class PSMDataset(BaseDataset, ABC):
 
-    supported_tasks = ["forecasting", "anomaly_detection"]
+    supported_tasks = ["forecasting", "reconstruction", "anomaly_detection"]
     description = "The PSM dataset is proposed by eBay and consists of 26 dimensional data captured internally from application server nodes. The dataset is used to predict the number of sessions in the next 10 minutes based on the current and historical data."
 
     def get_data(self, split=None):
@@ -23,6 +23,10 @@ class PSMDataset(BaseDataset, ABC):
 
 
 class PSMForecastingDataset(PSMDataset, ForecastDataset):
+    pass
+
+
+class PSMReconstructionDataset(PSMDataset, ReconstructionDataset):
     pass
 
 
@@ -44,5 +48,6 @@ class PSMAnomalyDetectionDataset(PSMDataset, AnomalyDetectionDataset):
 
 psm_datasets = {
     "forecasting": PSMForecastingDataset,
+    "reconstruction": PSMReconstructionDataset,
     "anomaly_detection": PSMAnomalyDetectionDataset,
 }
