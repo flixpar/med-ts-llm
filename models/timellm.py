@@ -191,14 +191,15 @@ class TimeLLM(nn.Module):
     def forward(self, inputs):
         pred = self.predict(inputs)
 
-        if self.task == "semantic_segmentation":
-            if self.n_classes > 2:
-                pred = F.softmax(pred, dim=-1)
-            else:
-                pred = F.sigmoid(pred)
-        elif self.task == "segmentation":
-            if self.config.tasks.segmentation.mode == "boundary-prediction":
-                pred = F.sigmoid(pred)
+        if not self.training:
+            if self.task == "semantic_segmentation":
+                if self.n_classes > 2:
+                    pred = F.softmax(pred, dim=-1)
+                else:
+                    pred = F.sigmoid(pred)
+            elif self.task == "segmentation":
+                if self.config.tasks.segmentation.mode == "boundary-prediction":
+                    pred = F.sigmoid(pred)
 
         return pred
 
