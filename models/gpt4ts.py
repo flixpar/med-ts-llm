@@ -73,7 +73,6 @@ class GPT4TS(nn.Module):
             n_output = self.num_class if self.num_class > 2 else 1
             self.out_layer = nn.Linear(self.d_ff, n_output, bias=True)
         if self.task == "segmentation":
-            assert self.config.tasks.segmentation.mode == "boundary-prediction"
             self.seg_mode = self.config.tasks.segmentation.mode
             self.ln_proj = nn.LayerNorm(self.d_ff)
             self.out_layer = nn.Linear(self.d_ff, 1, bias=True)
