@@ -204,6 +204,14 @@ class SegmentationTask(BaseTask):
         point_dists = (pred_points.reshape(-1, 1) - target_points).abs()
         segment_dists = all_pairs_iou(pred_segments, target_segments)
 
+        if len(pred_points) == 0:
+            return {
+                "point_mae": float("inf"),
+                "point_rmse": float("inf"),
+                "segment_miou": 0,
+                "pred_label_ratio": 0.0,
+            }
+
         metrics = {
             "point_mae": point_dists.min(dim=0).values.float().mean().item(),
             "point_rmse": point_dists.pow(2).min(dim=0).values.float().mean().sqrt().item(),
