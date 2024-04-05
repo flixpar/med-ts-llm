@@ -139,7 +139,7 @@ class BaseTask(ABC):
 
     def log_step(self, loss):
         self.step += self.config.training.batch_size
-        self.logger.log_scores(train_loss=loss)
+        self.logger.log_scores({"train/loss": loss})
 
     def log_epoch(self, scores={}, **kwscores):
         scores = scores | kwscores

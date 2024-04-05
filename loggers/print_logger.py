@@ -21,7 +21,7 @@ class PrintLogger(BaseLogger):
 
     def log_scores(self, scores={}, **kwscores):
         scores = scores | kwscores
-        if len(scores) == 1 and "train_loss" in scores:
+        if len(scores) == 1 and "train/loss" in scores:
             return
         print(f"Epoch: {self.trainer.epoch}, step: {self.trainer.step}, scores: {scores}")
 
