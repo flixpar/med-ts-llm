@@ -78,14 +78,13 @@ class ECGMITSegmentationDataset(ECGMITDataset, SegmentationDataset):
         features = data[feature_cols].values
         labels = data[label_col].values.astype(int)
         clip_ids = data[clip_col].values.astype(int)
-        timestamps = data[time_col].values
 
         desc_fn = "train_data_desc.csv" if split == "train" else "test_data_desc.csv"
         descriptions = pd.read_csv(basepath / desc_fn, index_col=0)
         descriptions = descriptions["data_desc"].to_dict()
         descriptions = {k: f"Patient description: {v}" for k, v in descriptions.items()}
 
-        return {"data": features, "labels": labels, "clip_ids": clip_ids, "timestamps": timestamps, "clip_descriptions": descriptions}
+        return {"data": features, "labels": labels, "clip_ids": clip_ids, "clip_descriptions": descriptions}
 
     def __getitem__(self, idx):
         idx = idx * self.step_size
@@ -94,7 +93,7 @@ class ECGMITSegmentationDataset(ECGMITDataset, SegmentationDataset):
         x = self.data[slice(*idx_range),:]
         y = self.labels[slice(*idx_range)]
 
-        clip_id = self.clip_ids[idx]
+        clip_id = self.clip_ids[idx].item()
         desc = self.clip_descriptions[clip_id]
 
         return {"x_enc": x, "labels": y, "descriptions": desc}
