@@ -29,7 +29,7 @@ def get_dataset(config, split):
     if config.data.mode == "univariate" and dataset.mode == "multivariate":
         dataset = multi_2_uni_dataset(dataset)
 
-    if not config.task in dataset.supported_tasks:
+    if not config.task in dataset_cls.supported_tasks:
         raise ValueError(f"Task {config.task} not supported by dataset {config.data.dataset}")
 
     dataset = dataset_cls(config, split)
