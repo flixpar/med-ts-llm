@@ -28,7 +28,7 @@ eval_metric_direction = "min"
 
 
 [tasks.pretraining]
-tasks = ["forecasting"]
+tasks = ["reconstruction"]
 datasets = "all"
 downsample_pct = 0.2
 n_features = 3

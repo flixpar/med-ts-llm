@@ -2,15 +2,34 @@ from abc import ABC
 from pathlib import Path
 import pandas as pd
 
-from .base import BaseDataset, ForecastDataset, AnomalyDetectionDataset, SegmentationDataset
+from .base import (
+    BaseDataset,
+    ForecastDataset,
+    ReconstructionDataset,
+    AnomalyDetectionDataset,
+    SegmentationDataset,
+)
 
 
 class ECGMITDataset(BaseDataset, ABC):
-    supported_tasks = ["forecasting", "anomaly_detection", "segmentation"]
+    supported_tasks = ["forecasting", "reconstruction", "anomaly_detection", "segmentation"]
     description = "The MIT-BIH Arrhythmia Database contains excerpts of two-channel ambulatory ECG from a mixed population of inpatients and outpatients, digitized at 360 samples per second per channel with 11-bit resolution over a 10 mV range."
 
 
 class ECGMITForecastingDataset(ECGMITDataset, ForecastDataset):
+    def get_data(self, split=None):
+        split = split or self.split
+
+        basepath = Path(__file__).parent / "../data/mit_ecg/anom/"
+        split_fn = "train.csv" if split == "train" else "test.csv"
+        data = pd.read_csv(basepath / split_fn)
+        data = data.drop(columns=["time", "patient_id"])
+        data = data.values
+
+        return {"data": data}
+
+
+class ECGMITReconstructionDataset(ECGMITDataset, ReconstructionDataset):
     def get_data(self, split=None):
         split = split or self.split
 
@@ -83,6 +102,7 @@ class ECGMITSegmentationDataset(ECGMITDataset, SegmentationDataset):
 
 ecg_datasets = {
     "forecasting": ECGMITForecastingDataset,
+    "reconstruction": ECGMITReconstructionDataset,
     "anomaly_detection": ECGMITAnomalyDetectionDataset,
     "segmentation": ECGMITSegmentationDataset,
 }

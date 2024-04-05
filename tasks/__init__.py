@@ -1,5 +1,6 @@
 from .forecasting import ForecastTask
 from .anomaly_detection import AnomalyDetectionTask
+from .reconstruction import ReconstructionTask
 from .segmentation import SegmentationTask
 from .semantic_segmentation import SemanticSegmentationTask
 from .pretraining import PretrainingTask
@@ -8,6 +9,7 @@ from .pretraining import PretrainingTask
 task_lookup = {
     "forecasting": ForecastTask,
     "anomaly_detection": AnomalyDetectionTask,
+    "reconstruction": ReconstructionTask,
     "segmentation": SegmentationTask,
     "semantic_segmentation": SemanticSegmentationTask,
     "pretraining": PretrainingTask,

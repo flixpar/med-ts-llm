@@ -96,7 +96,7 @@ class PretrainingDataset(Dataset):
     def adjust_n_features(self, x):
         if x.shape[1] < self.n_features:
             repeats = math.ceil(self.n_features / x.shape[1])
-            x = np.tile(x, (1, repeats))
+            x = x.repeat(1, repeats)
         if x.shape[1] > self.n_features:
             x = x[:, :self.n_features]
         return x

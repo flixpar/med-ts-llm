@@ -9,7 +9,7 @@ from einops import rearrange
 
 class GPT4TS(nn.Module):
 
-    supported_tasks = ["forecasting", "imputation", "anomaly_detection", "classification", "semantic_segmentation", "segmentation"]
+    supported_tasks = ["forecasting", "imputation", "reconstruction", "anomaly_detection", "classification", "semantic_segmentation", "segmentation"]
     supported_modes = ["multivariate", "univariate"]
 
     def __init__(self, config, dataset):
@@ -60,7 +60,7 @@ class GPT4TS(nn.Module):
         if self.task == "imputation":
             self.ln_proj = nn.LayerNorm(self.d_model)
             self.out_layer = nn.Linear(self.d_model, self.c_out, bias=True)
-        if self.task == "anomaly_detection":
+        if self.task == "anomaly_detection" or self.task == "reconstruction":
             self.ln_proj = nn.LayerNorm(self.d_ff)
             self.out_layer = nn.Linear(self.d_ff, self.c_out, bias=True)
         if self.task == "classification":
