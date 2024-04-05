@@ -126,6 +126,9 @@ class TimeLLM(nn.Module):
             case x:
                 raise ValueError(f"Invalid dtype selection: {x}")
 
+        attn_implementation = "flash_attention_2" if (model_dtype in [torch.float16, torch.bfloat16]) else "sdpa"
+        attn_implementation = attn_implementation if ("mamba" not in self.llm_id) and () else "eager"
+
         if self.model_config.llm.load_in_4bit or self.model_config.llm.load_in_8bit:
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit = self.model_config.llm.load_in_4bit,
@@ -139,14 +142,12 @@ class TimeLLM(nn.Module):
         else:
             quantization_config = None
 
-        attn_implmentation = "flash_attention_2" if ("mamba" not in self.llm_id) else "eager"
-
         llm = AutoModel.from_pretrained(
             self.llm_id,
             config = llm_config,
             quantization_config = quantization_config,
             torch_dtype = model_dtype,
-            attn_implementation = attn_implmentation,
+            attn_implementation = attn_implementation,
             cache_dir = cache_dir,
             trust_remote_code = True,
             device_map = "auto",
@@ -237,7 +238,7 @@ class TimeLLM(nn.Module):
             prompt_embeddings = self.llm.get_input_embeddings()(prompt.to(x_enc.device)) # [bs, n_tok, d_llm]
             prompt_embeddings = prompt_embeddings.to(enc_out.dtype)
 
-            if self.covariate_mode == "independent":
+            if self.covariate_mode == "independent" or self.covariate_mode == "merge-end":
                 prompt_embeddings = prompt_embeddings.repeat_interleave(n_features, dim=0)
 
             llm_enc_out = torch.cat([prompt_embeddings, enc_out], dim=1)
