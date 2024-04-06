@@ -88,7 +88,8 @@ class TimeLLM(nn.Module):
         self.embedding_downsample_mode = self.model_config.embedding_downsample_mode
         if self.embedding_downsample_mode == "linear":
             self.embedding_downsample_layer = nn.Linear(self.d_llm, self.d_ff)
-            self.embedding_downsample_mode = "truncate"
+        elif self.embedding_downsample_mode == "average":
+            assert self.d_llm % self.d_ff == 0
 
         if not self.llm_enabled:
             self.llm_replacement = nn.Sequential(
