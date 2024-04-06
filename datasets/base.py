@@ -17,6 +17,7 @@ class BaseDataset(Dataset, ABC):
     clip_descriptions = None
 
     normalizer = None
+    univariate = False
 
     supported_tasks = []
 
@@ -118,9 +119,7 @@ class ForecastDataset(BaseDataset, ABC):
         assert self.task == "forecasting"
 
     def __getitem__(self, idx):
-        idx = idx * self.step_size
-        x_range = (idx, idx + self.history_len)
-        y_range = (x_range[1], x_range[1] + self.pred_len)
+        x_range, y_range = self.inverse_index(idx)
 
         x = self.data[slice(*x_range),:]
         y = self.data[slice(*y_range),:]
@@ -131,7 +130,10 @@ class ForecastDataset(BaseDataset, ABC):
         return (self.n_points - self.history_len - self.pred_len + 1) // self.step_size
 
     def inverse_index(self, idx):
-        return (idx * self.step_size) + self.history_len
+        idx = idx * self.step_size
+        x_range = (idx, idx + self.history_len)
+        y_range = (x_range[1], x_range[1] + self.pred_len)
+        return x_range, y_range
 
 
 class ReconstructionDataset(BaseDataset, ABC):
@@ -142,8 +144,7 @@ class ReconstructionDataset(BaseDataset, ABC):
         assert self.pred_len == self.history_len
 
     def __getitem__(self, idx):
-        idx = idx * self.step_size
-        x_range = (idx, idx + self.pred_len)
+        x_range = self.inverse_index(idx)
         x = self.data[slice(*x_range),:]
         return {"x_enc": x}
 
@@ -151,7 +152,9 @@ class ReconstructionDataset(BaseDataset, ABC):
         return (self.n_points - self.pred_len) // self.step_size + 1
 
     def inverse_index(self, idx):
-        return idx * self.step_size
+        idx = idx * self.step_size
+        x_range = (idx, idx + self.pred_len)
+        return x_range
 
 
 class AnomalyDetectionDataset(BaseDataset, ABC):
@@ -162,8 +165,7 @@ class AnomalyDetectionDataset(BaseDataset, ABC):
         assert self.pred_len == self.history_len
 
     def __getitem__(self, idx):
-        idx = idx * self.step_size
-        x_range = (idx, idx + self.pred_len)
+        x_range = self.inverse_index(idx)
         x = self.data[slice(*x_range),:]
 
         if self.labels is not None:
@@ -177,7 +179,9 @@ class AnomalyDetectionDataset(BaseDataset, ABC):
         return (self.n_points - self.pred_len) // self.step_size + 1
 
     def inverse_index(self, idx):
-        return idx * self.step_size
+        idx = idx * self.step_size
+        x_range = (idx, idx + self.pred_len)
+        return x_range
 
 
 class SemanticSegmentationDataset(BaseDataset, ABC):
@@ -188,8 +192,7 @@ class SemanticSegmentationDataset(BaseDataset, ABC):
         assert self.pred_len == self.history_len
 
     def __getitem__(self, idx):
-        idx = idx * self.step_size
-        idx_range = (idx, idx + self.pred_len)
+        idx_range = self.inverse_index(idx)
 
         x = self.data[slice(*idx_range),:]
         y = self.labels[slice(*idx_range)]
@@ -200,7 +203,9 @@ class SemanticSegmentationDataset(BaseDataset, ABC):
         return (self.n_points - self.pred_len) // self.step_size + 1
 
     def inverse_index(self, idx):
-        return idx * self.step_size
+        idx = idx * self.step_size
+        idx_range = (idx, idx + self.pred_len)
+        return idx_range
 
     @property
     def n_classes(self):
@@ -216,8 +221,7 @@ class SegmentationDataset(BaseDataset, ABC):
         self.convert_labels()
 
     def __getitem__(self, idx):
-        idx = idx * self.step_size
-        idx_range = (idx, idx + self.pred_len)
+        idx_range = self.inverse_index(idx)
 
         x = self.data[slice(*idx_range),:]
         y = self.labels[slice(*idx_range)]
@@ -228,7 +232,9 @@ class SegmentationDataset(BaseDataset, ABC):
         return (self.n_points - self.pred_len) // self.step_size + 1
 
     def inverse_index(self, idx):
-        return idx * self.step_size
+        idx = idx * self.step_size
+        idx_range = (idx, idx + self.pred_len)
+        return idx_range
 
     def convert_labels(self):
         if self.task_config.mode == "steps-to-boundary":

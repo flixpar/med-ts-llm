@@ -91,11 +91,10 @@ class SegmentationTask(BaseTask):
 
                 for j in range(pred.size(0)):
                     inds = dataset.inverse_index((idx * bs) + j)
-                    time_idx = inds[0] if isinstance(inds, tuple) else inds
-                    time_idx = slice(time_idx, time_idx + pred.size(1))
+                    time_inds = slice(*(inds[0] if dataset.univariate else inds))
 
-                    preds[time_idx] = pred[j].squeeze().cpu().detach()
-                    targets[time_idx] = inputs["labels"][j].squeeze().cpu().detach()
+                    preds[time_inds] = pred[j].squeeze().cpu().detach()
+                    targets[time_inds] = inputs["labels"][j].squeeze().cpu().detach()
 
         if step_size > pred_len:
             cutoff = n_points - (n_points % step_size)

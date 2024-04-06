@@ -87,8 +87,7 @@ class ECGMITSegmentationDataset(ECGMITDataset, SegmentationDataset):
         return {"data": features, "labels": labels, "clip_ids": clip_ids, "clip_descriptions": descriptions}
 
     def __getitem__(self, idx):
-        idx = idx * self.step_size
-        idx_range = (idx, idx + self.pred_len)
+        idx_range = self.inverse_index(idx)
 
         x = self.data[slice(*idx_range),:]
         y = self.labels[slice(*idx_range)]

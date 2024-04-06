@@ -70,11 +70,11 @@ class ForecastTask(BaseTask):
 
                 for j in range(pred.size(0)):
                     inds = dataset.inverse_index((idx * bs) + j)
-                    time_idx, feature_idx = inds if isinstance(inds, tuple) else (inds, slice(None))
-                    time_idx = slice(time_idx, time_idx + pred.size(1))
+                    time_inds, feature_inds = inds if dataset.univariate else (inds, slice(None))
+                    time_inds = slice(*time_inds)
 
-                    preds[time_idx, feature_idx] = pred[j].squeeze().cpu().detach()
-                    targets[time_idx, feature_idx] = inputs["y"][j].squeeze().cpu().detach()
+                    preds[time_inds, feature_inds] = pred[j].squeeze().cpu().detach()
+                    targets[time_inds, feature_inds] = inputs["y"][j].squeeze().cpu().detach()
 
         if step_size > pred_len:
             cutoff = n_points - (n_points % step_size)
