@@ -73,6 +73,9 @@ class PretrainingDataset(Dataset):
         self.real_features = n_features
         self.n_classes = 0
 
+        self.univariate = False
+        self.clip_dataset = False
+
         self.pred_len = self.datasets[0].pred_len
         self.history_len = self.datasets[0].history_len
         self.step_size = self.datasets[0].step_size
@@ -110,4 +113,6 @@ class PretrainingDataset(Dataset):
         return dataset_idx, index_in_dataset
 
     def inverse_index(self, index):
-        return index * self.step_size
+        idx = idx * self.step_size
+        x_range = (idx, idx + self.pred_len)
+        return x_range

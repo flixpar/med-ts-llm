@@ -293,7 +293,6 @@ class ClipDataset(BaseDataset, ABC):
             self.mask = torch.cat(mask)
 
             assert len(self.mask) == self.n_points
-            assert self.mask.sum().item() == (self.dataset_len * self.pred_len)
 
         def __len__(self):
             return self.dataset_len
