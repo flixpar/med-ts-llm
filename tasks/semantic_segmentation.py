@@ -67,8 +67,7 @@ class SemanticSegmentationTask(BaseTask):
         dataset = dataloader.dataset
         pred_len = self.config.pred_len
         step_size = dataset.step_size
-        dataset_len = ((dataset.n_points - pred_len) // step_size) + 1
-        n_points = pred_len + ((dataset_len - 1) * step_size)
+        n_points = dataset.n_points if dataset.clip_dataset else pred_len + ((len(dataset) - 1) * step_size)
 
         n_classes = dataset.n_classes
         bs = dataloader.batch_size
@@ -92,13 +91,16 @@ class SemanticSegmentationTask(BaseTask):
         if n_classes == 2:
             preds[:, 0] = 1 - preds[:, 1]
 
-        if step_size > pred_len:
+        if dataset.clip_dataset:
+            mask = dataset.mask
+            preds, targets = preds[mask,:], targets[mask]
+        elif step_size > pred_len:
             cutoff = n_points - (n_points % step_size)
             preds, targets = preds[:cutoff,:], targets[:cutoff]
             preds = preds.reshape(-1, step_size, n_classes)[:, :pred_len, :].reshape(-1, n_classes)
             targets = targets.reshape(-1, step_size)[:, :pred_len].reshape(-1)
 
-        assert not torch.isnan(preds).any()
+        assert not preds.isnan().any()
         assert not (targets < 0).any()
 
         return preds, targets

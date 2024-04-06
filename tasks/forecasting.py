@@ -54,10 +54,9 @@ class ForecastTask(BaseTask):
         dataset = dataloader.dataset
         pred_len = self.config.pred_len
         step_size = dataset.step_size
-        dataset_len = ((dataset.n_points - pred_len) // step_size) + 1
-        n_points = pred_len + ((dataset_len - 1) * step_size)
+        n_points = dataset.n_points if dataset.clip_dataset else pred_len + ((len(dataset) - 1) * step_size)
 
-        n_features = getattr(dataset, "real_features", dataset.n_features)
+        n_features = dataset.real_features
         bs = dataloader.batch_size
 
         preds = torch.full((n_points, n_features), float("nan"))
@@ -76,14 +75,17 @@ class ForecastTask(BaseTask):
                     preds[time_inds, feature_inds] = pred[j].squeeze().cpu().detach()
                     targets[time_inds, feature_inds] = inputs["y"][j].squeeze().cpu().detach()
 
-        if step_size > pred_len:
+        if dataset.clip_dataset:
+            mask = dataset.mask
+            preds, targets = preds[mask,:], targets[mask,:]
+        elif step_size > pred_len:
             cutoff = n_points - (n_points % step_size)
             preds, targets = preds[:cutoff,:], targets[:cutoff,:]
             preds = preds.reshape(-1, step_size, n_features)[:, :pred_len, :].reshape(-1, n_features)
             targets = targets.reshape(-1, step_size, n_features)[:, :pred_len, :].reshape(-1, n_features)
 
-        assert not torch.isnan(preds).any()
-        assert not torch.isnan(targets).any()
+        assert not preds.isnan().any()
+        assert not targets.isnan().any()
 
         return preds, targets
 
