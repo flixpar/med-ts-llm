@@ -62,8 +62,10 @@ class BaseDataset(Dataset, ABC):
             self.data = data["data"]
             self.data = self.normalize(self.data)
             self.data = torch.tensor(self.data, dtype=torch.float32)
-        if "labels" in data:
-            self.labels = torch.tensor(data["labels"], dtype=torch.int32)
+        if "labels" in data and data["labels"] is not None:
+            n_labels = len(np.unique(data["labels"]))
+            int_dtype = torch.long if (n_labels > 2) else torch.int32
+            self.labels = torch.tensor(data["labels"], dtype=int_dtype)
         if "timestamps" in data:
             self.timestamps = torch.tensor(data["timestamps"], dtype=torch.float32)
         if "clip_ids" in data:

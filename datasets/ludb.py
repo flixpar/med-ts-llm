@@ -47,8 +47,8 @@ class LUDBSemanticSegmentationDataset(LUDBDataset, SemanticSegmentationDataset):
         x = self.data[slice(*idx_range),:]
         y = self.labels[slice(*idx_range)]
 
-        patient_id = self.patient_ids[idx]
-        desc = self.descriptions[patient_id]
+        clip_id = self.clip_ids[idx].item()
+        desc = self.clip_descriptions[clip_id]
 
         return {"x_enc": x, "labels": y, "descriptions": f"Patient description: {desc}"}
 
