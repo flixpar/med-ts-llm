@@ -9,6 +9,7 @@ from torch.utils.data import Dataset
 
 def multi_2_uni_dataset(dataset_cls):
     class Multi2UniDataset(dataset_cls):
+        univariate = True
 
         @property
         def n_features(self):
@@ -74,7 +75,7 @@ class PretrainingDataset(Dataset):
 
         self.pred_len = self.datasets[0].pred_len
         self.history_len = self.datasets[0].history_len
-        self.step_size = self.history_len + self.pred_len
+        self.step_size = self.datasets[0].step_size
         self.n_points = sum(self.step_size * l for l in self.lens)
 
     def __getitem__(self, index):

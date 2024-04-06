@@ -10,19 +10,28 @@ def get_run_id(debug=False):
         run_id = "DEBUG-" + run_id
     return run_id
 
+
 def set_seed(seed):
     random.seed(seed)
     torch.manual_seed(seed)
 
+
 class dict_to_object(object):
     def __init__(self, d):
         self.__dict__ = {k: dict_to_object(v) if isinstance(v, dict) else v for k, v in d.items()}
+
     def to_dict(self):
         return {k: v.to_dict() if isinstance(v, dict_to_object) else v for k, v in self.__dict__.items()}
+
     def get(self, key, default=None):
         return self.__dict__.get(key, default)
+
+    def __getitem__(self, key):
+        return self.__dict__[key]
+
     def copy(self):
         return deepcopy(self)
+
 
 def get_logging_tags(config):
     tags = [
@@ -42,6 +51,7 @@ def summarize_config(config):
 
     return config
 
+
 def flatten_dict(d, parent_key="", sep="."):
     output = {}
     for k, v in d.items():
@@ -51,3 +61,15 @@ def flatten_dict(d, parent_key="", sep="."):
         else:
             output[new_key] = v
     return output
+
+
+def get_dtype(dtype_name):
+    match dtype_name:
+        case "bfloat16" | "bf16":
+            return torch.bfloat16
+        case "float16" | "half" | "fp16" | "16" | 16:
+            return torch.float16
+        case "float32" | "float" | "fp32" | "32" | 32 | "mixed":
+            return torch.float32
+        case x:
+            raise ValueError(f"Invalid dtype selection: {x}")
