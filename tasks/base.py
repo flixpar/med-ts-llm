@@ -197,7 +197,15 @@ class BaseTask(ABC):
         self.logger.log_scores({"train/loss": loss})
 
     def log_epoch(self, scores={}, **kwscores):
-        scores = scores | kwscores
+        match self.scheduler.get_last_lr():
+            case [lr]:
+                lrs = {"train/lr": lr}
+            case [lr, finetune_lr]:
+                lrs = {"train/lr": lr, "train/finetune_lr": finetune_lr}
+            case _:
+                lrs = {}
+
+        scores = scores | kwscores | lrs
         self.logger.log_scores(scores)
         self.logger.save_state("latest")
 
@@ -209,7 +217,8 @@ class BaseTask(ABC):
             self.best_score = scores[metric]
             self.logger.save_state("best")
 
-        self.epoch += 1
+        if self.epoch < self.config.training.epochs:
+            self.epoch += 1
 
     def log_scores(self, scores={}, **kwscores):
         self.logger.log_scores(scores | kwscores)
