@@ -112,7 +112,7 @@ class PretrainingDataset(Dataset):
         index_in_dataset = self.datasets[dataset_idx].inverse_index(index_in_dataset)
         return dataset_idx, index_in_dataset
 
-    def inverse_index(self, index):
+    def inverse_index(self, idx):
         idx = idx * self.step_size
         x_range = (idx, idx + self.pred_len)
         return x_range

@@ -62,6 +62,8 @@ class LUDBReconstructionDataset(LUDBDataset, ReconstructionDataset):
 
 
 class LUDBSemanticSegmentationDataset(LUDBDataset, ClipDataset, SemanticSegmentationDataset):
+    n_classes = 4
+
     def __init__(self, config, split):
         super().__init__(config, split)
         assert self.dataset_config.version == "v2"
