@@ -5,11 +5,11 @@ from tasks import get_trainer
 from utils import *
 
 
-def main(config_path):
+def main(config_path, run_id=None):
     config = toml.load(config_path)
     config = dict_to_object(config)
 
-    run_id = get_run_id(config.DEBUG)
+    run_id = run_id or get_run_id(config.DEBUG)
     trainer = get_trainer(run_id, config)
 
     trainer.train()
@@ -19,6 +19,12 @@ def main(config_path):
     print("Test results:", test_scores)
     print("Run ID:", run_id)
 
+
 if __name__ == "__main__":
-    config_path = sys.argv[1] if len(sys.argv) > 1 else "configs/config.toml"
-    main(config_path)
+    match sys.argv:
+        case [_, config_path, run_id]:
+            main(config_path, run_id)
+        case [_, config_path]:
+            main(config_path)
+        case _:
+            main("configs/config.toml")

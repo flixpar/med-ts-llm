@@ -11,7 +11,12 @@ class BaseLogger(ABC):
         self.config = config
         self.newrun = newrun
 
-        self.logdir = Path(__file__).parent / f"../outputs/logs/{self.trainer.run_id}/"
+        if basepath := config.get("paths", {}).get("logdir"):
+            basepath = Path(basepath)
+        else:
+            basepath = Path(__file__).parent / "../outputs/logs/"
+
+        self.logdir = basepath / self.trainer.run_id
         self.logdir.mkdir(parents=True, exist_ok=True)
 
         if self.newrun:
