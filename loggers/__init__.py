@@ -1,11 +1,12 @@
 from .wandb_logger import WandBLogger
 from .tensorboard_logger import TensorboardLogger
 from .print_logger import PrintLogger
+from .debug_logger import DebugLogger
 
 
 def get_logger(trainer, config, newrun=True):
     if config.DEBUG:
-        return PrintLogger(trainer, config, newrun)
+        return DebugLogger(trainer, config, newrun)
     match config.setup.logger:
         case "wandb":
             return WandBLogger(trainer, config, newrun)
