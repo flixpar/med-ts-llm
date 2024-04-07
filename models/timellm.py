@@ -189,6 +189,8 @@ class TimeLLM(nn.Module):
             for k in llm_keys:
                 del state_dict[k]
 
+        del state_dict["word_embeddings"]
+
         return state_dict
 
     def forward(self, inputs):
@@ -272,7 +274,7 @@ class TimeLLM(nn.Module):
             dec_out = dec_out.mean(dim=1)
         elif self.covariate_mode == "merge-end":
             dec_out = dec_out.view(bs, self.n_features, self.pred_len, self.n_outputs_per_step)
-            dec_out = dec_out.permute(0, 2, 3, 1).view(bs, self.pred_len, -1).contiguous() # [bs, pred_len, n_features*n_outputs_per_step]
+            dec_out = dec_out.permute(0, 2, 3, 1).reshape(bs, self.pred_len, -1).contiguous() # [bs, pred_len, n_features*n_outputs_per_step]
             dec_out = self.feature_weighting(dec_out) # [bs, pred_len, n_outputs_per_step]
         else:
             dec_out = dec_out.view(bs, self.pred_len, self.n_outputs_per_step)
