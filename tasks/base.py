@@ -38,7 +38,10 @@ class BaseTask(ABC):
         self.build_dataloaders()
 
         self.model = self.build_model().to(self.device, self.dtype)
+        self.load_pretrained()
+
         self.optimizer = self.build_optimizer()
+        self.scheduler = self.build_scheduler()
         self.loss_fn = self.build_loss().to(device=self.device)
 
         self.epoch = 1
@@ -80,7 +83,16 @@ class BaseTask(ABC):
         return self.model
 
     def build_optimizer(self):
-        params = [p for p in self.model.parameters() if p.requires_grad]
+        trainable_params = [p for p in self.model.parameters() if p.requires_grad]
+
+        if self.config.finetuning.enabled and self.config.finetuning.frozen_epochs > 0:
+            pretrained_params = [p for (n, p) in self.model.named_parameters() if n in self.loaded_params]
+            for p in pretrained_params:
+                p.requires_grad = True
+            params = [{"params": trainable_params}, {"params": pretrained_params, "lr": 0.0}]
+        else:
+            params = trainable_params
+
         match self.config.training.optimizer:
             case "adam":
                 self.optimizer = optim.Adam(params, lr=self.config.training.learning_rate)
@@ -93,7 +105,50 @@ class BaseTask(ABC):
                 self.optimizer = pytorch_optimizer.Ranger21(params, num_iterations=num_iter, lr=self.config.training.learning_rate)
             case _:
                 raise ValueError(f"Invalid optimizer selection: {self.config.training.optimizer}")
+
         return self.optimizer
+
+    def build_scheduler(self):
+        scheduler_type = self.config.training.get("lr_scheduler")
+        match scheduler_type:
+            case None | "none" | "constant":
+                self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=1, gamma=1)
+            case _:
+                raise ValueError(f"Invalid scheduler selection: {scheduler_type}")
+
+        if self.config.finetuning.enabled and self.config.finetuning.frozen_epochs > 0:
+            assert scheduler_type in ["none", "constant", None], "Frozen epochs only supported with constant scheduler"
+            self.scheduler = FineTuningScheduler(
+                self.optimizer,
+                initial_lr=self.config.training.learning_rate,
+                frozen_epochs=self.config.finetuning.frozen_epochs,
+            )
+
+        return self.scheduler
+
+    def load_pretrained(self):
+        if ("finetuning" not in self.config) or (not self.config.finetuning.enabled):
+            return
+
+        assert self.config.model == "timellm", "Only TimeLLM supports finetuning"
+
+        cfg = self.config.finetuning
+
+        pretrained_path = Path(__file__).parent / f"../outputs/logs/{cfg.pretrained_id}/checkpoints/{cfg.pretrained_ckpt}.pt"
+        saved_state = torch.load(pretrained_path)["model"]
+        loaded_params = self.model.load_pretrained(saved_state)
+
+        if cfg.freeze_forever:
+            for name, param in self.model.named_parameters():
+                if name in loaded_params:
+                    param.requires_grad = False
+
+        if cfg.frozen_epochs > 0:
+            assert not cfg.freeze_forever, "Cannot freeze forever and then unfreeze"
+            self.loaded_params = loaded_params
+            for name, param in self.model.named_parameters():
+                if name in loaded_params:
+                    param.requires_grad = False
 
     def build_datasets(self):
         self.train_dataset = get_dataset(self.config, "train")
@@ -209,3 +264,20 @@ class BaseTask(ABC):
         trainer.step = state["step"]
 
         return trainer
+
+
+class FineTuningScheduler(optim.lr_scheduler._LRScheduler):
+
+    def __init__(self, optimizer, initial_lr, frozen_epochs, last_epoch=-1):
+        self.initial_lr = initial_lr
+        self.frozen_epochs = frozen_epochs
+        super().__init__(optimizer, last_epoch)
+
+    def get_lr(self):
+        group_lrs = [group["lr"] for group in self.optimizer.param_groups]
+        if self.last_epoch < self.frozen_epochs:
+            return [group_lrs[0], 0]
+        elif self.last_epoch == self.frozen_epochs:
+            return [group_lrs[0], self.initial_lr]
+        else:
+            return group_lrs

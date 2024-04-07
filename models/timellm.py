@@ -333,6 +333,20 @@ class TimeLLM(nn.Module):
             raise ValueError(f"Task {self.task} is not supported.")
         return self.task_description
 
+    def load_pretrained(self, saved_state):
+        if "word_embeddings" in saved_state:
+            del saved_state["word_embeddings"]
+        if "output_projection.linear.bias" in saved_state:
+            del saved_state["output_projection.linear.bias"]
+        if "output_projection.linear.weight" in saved_state:
+            del saved_state["output_projection.linear.weight"]
+
+        incompat_keys = self.load_state_dict(saved_state, strict=False)
+        assert len(incompat_keys.unexpected_keys) == 0, f"Unexpected keys in model state: {incompat_keys.unexpected_keys}"
+
+        loaded_keys = list(saved_state.keys())
+        return loaded_keys
+
 
 def calcute_lags(x, n_lags=5):
     x = x.permute(0, 2, 1).contiguous()
