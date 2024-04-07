@@ -12,6 +12,8 @@ transformers.logging.set_verbosity_error()
 from .layers.embed import PatchEmbedding
 from .layers.RevIN import RevIN
 
+from utils import dict_to_object
+
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -283,39 +285,102 @@ class TimeLLM(nn.Module):
         return dec_out
 
     def build_prompt(self, inputs):
-        x_enc = inputs["x_enc"]
-        if x_enc.ndim == 2:
-            x_enc = x_enc.unsqueeze(-1)
+        bs = inputs["x_enc"].size(0)
 
-        with torch.no_grad():
-            min_values = torch.min(x_enc, dim=1).values
-            max_values = torch.max(x_enc, dim=1).values
-            medians = torch.median(x_enc.float(), dim=1).values
-            lags = calcute_lags(x_enc.float(), self.n_lags)
-            trends = x_enc.diff(dim=1).sum(dim=1)
-            descriptions = inputs.get("descriptions")
+        cfg = self.model_config.prompting
+        if cfg is None:
+            cfg = {"dataset": True, "clip": True, "input_stats": True, "task": True, "input_stats_dim": 0, "input_stats_select": "all"}
+            cfg = dict_to_object(cfg)
+
+        if not (cfg.dataset or cfg.clip or cfg.input_stats or cfg.task):
+            return [""] * bs
+
+        if cfg.dataset:
+            dataset_prompt = f"Dataset: {self.dataset_description}"
+        else:
+            dataset_prompt = ""
+
+        if cfg.clip:
+            clip_prompts = inputs.get("descriptions", [""] * bs)
+        else:
+            clip_prompts = [""] * bs
+
+        if cfg.input_stats:
+            input_stats_prompts = self.build_input_stats_prompt(cfg, inputs)
+        else:
+            input_stats_prompts = [""] * bs
+
+        if cfg.task:
+            task_prompt = f"Task: {self.task_description}"
+        else:
+            task_prompt = ""
 
         prompts = []
-        for b in range(x_enc.size(0)):
-            min_value = min_values[b][0].item()
-            max_value = max_values[b][0].item()
-            median_value = medians[b][0].item()
-            lags_value = lags[b].tolist()
-            trend_dir = "upward" if trends[b].mean() > 0 else "downward"
-            prompt = (
-                f"<|start_prompt|>"
-                f"Dataset description: {self.dataset_description} "
-                f"{descriptions[b]} " if descriptions is not None else ""
-                f"Task description: {self.task_description} "
-                f"Input statistics: "
-                f"min value = {min_value:.3f}, "
-                f"max value = {max_value:.3f}, "
-                f"median value = {median_value:.3f}, "
-                f"the trend of input is {trend_dir}, "
-                f"top 5 lags are {lags_value}"
-                f"<|<end_prompt>|>"
-            )
+        for b in range(bs):
+            parts = [
+                dataset_prompt,
+                clip_prompts[b],
+                input_stats_prompts[b],
+                task_prompt,
+            ]
+            prompt = " ".join([p for p in parts if p])
+            prompt = "<|start_prompt|>" + prompt + "<|end_prompt|>"
+            prompts.append(prompt)
 
+        return prompts
+
+    def build_input_stats_prompt(self, cfg, inputs):
+        xs = inputs["x_enc"].detach() # [bs, seq_len, n_features]
+        if xs.ndim == 2:
+            xs = xs.unsqueeze(-1)
+
+        assert cfg.input_stats_select == "all"
+
+        def fmt_list(xs):
+            return "[" + ", ".join(xs) + "]"
+
+        def fmt_float(x):
+            if isinstance(x, list):
+                return fmt_list([fmt_float(v) for v in x])
+            return f"{x:.3f}"
+
+        def fmt_trend(x):
+            match x:
+                case True:
+                    return "upward"
+                case False:
+                    return "downward"
+                case [*xs]:
+                    return fmt_list([fmt_trend(x) for x in xs])
+                case _:
+                    return x
+
+        if cfg.input_stats_dim == "all":
+            prompt_insert = "per feature"
+            s = "s"
+        else:
+            d = cfg.input_stats_dim
+            prompt_insert = f"feature {d}"
+            xs = xs[:, :, d]
+            s = ""
+
+        with torch.no_grad():
+            min_values = torch.min(xs, dim=1).values.tolist()
+            max_values = torch.max(xs, dim=1).values.tolist()
+            medians = torch.median(xs.float(), dim=1).values.tolist()
+            trends = (xs.diff(dim=1).sum(dim=1) > 0).tolist()
+            lags = calcute_lags(xs.float(), self.n_lags).tolist()
+
+        prompts = []
+        for b in range(xs.size(0)):
+            prompt = (
+                f"Input statistics ({prompt_insert}): "
+                f"min value{s} = {fmt_float(min_values[b])}, "
+                f"max value{s} = {fmt_float(max_values[b])}, "
+                f"median value{s} = {fmt_float(medians[b])}, "
+                f"the trend of input is {fmt_trend(trends[b])}, "
+                f"the top {self.n_lags} lags are {lags[b]}."
+            )
             prompts.append(prompt)
 
         return prompts
@@ -349,7 +414,7 @@ class TimeLLM(nn.Module):
 
 
 def calcute_lags(x, n_lags=5):
-    x = x.permute(0, 2, 1).contiguous()
+    x = x.permute(0, 2, 1).contiguous() if x.ndim == 3 else x.unsqueeze(1)
     q_fft = torch.fft.rfft(x, dim=-1)
     k_fft = torch.fft.rfft(x, dim=-1)
     res = q_fft * torch.conj(k_fft)
