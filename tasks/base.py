@@ -85,7 +85,7 @@ class BaseTask(ABC):
     def build_optimizer(self):
         trainable_params = [p for p in self.model.parameters() if p.requires_grad]
 
-        if self.config.finetuning.enabled and self.config.finetuning.frozen_epochs > 0:
+        if ("finetuning" in self.config) and self.config.finetuning.enabled and (self.config.finetuning.frozen_epochs > 0):
             pretrained_params = [p for (n, p) in self.model.named_parameters() if n in self.loaded_params]
             for p in pretrained_params:
                 p.requires_grad = True
@@ -116,7 +116,7 @@ class BaseTask(ABC):
             case _:
                 raise ValueError(f"Invalid scheduler selection: {scheduler_type}")
 
-        if self.config.finetuning.enabled and self.config.finetuning.frozen_epochs > 0:
+        if ("finetuning" in self.config) and self.config.finetuning.enabled and (self.config.finetuning.frozen_epochs > 0):
             assert scheduler_type in ["none", "constant", None], "Frozen epochs only supported with constant scheduler"
             self.scheduler = FineTuningScheduler(
                 self.optimizer,
