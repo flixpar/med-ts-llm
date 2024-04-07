@@ -289,7 +289,7 @@ class TimeLLM(nn.Module):
     def build_prompt(self, inputs):
         bs = inputs["x_enc"].size(0)
 
-        cfg = self.model_config.prompting
+        cfg = self.model_config.get("prompting")
         if cfg is None:
             cfg = {"dataset": True, "clip": True, "input_stats": True, "task": True, "input_stats_dim": 0, "input_stats_select": "all"}
             cfg = dict_to_object(cfg)
