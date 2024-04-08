@@ -5,6 +5,7 @@ from .ecg import ecg_datasets
 from .ventilator import ventilator_datasets
 from .bidmc import bidmc_datasets
 from .ludb import ludb_datasets
+from .dreams import dreams_datasets
 
 from .util import multi_2_uni_dataset
 from .util import PretrainingDataset
@@ -21,6 +22,7 @@ dataset_lookup = {
     "ventilator": ventilator_datasets,
     "bidmc": bidmc_datasets,
     "ludb": ludb_datasets,
+    "dreams": dreams_datasets,
 }
 
 def get_dataset(config, split):
