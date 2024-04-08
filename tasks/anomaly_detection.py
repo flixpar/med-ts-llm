@@ -49,28 +49,30 @@ class AnomalyDetectionTask(BaseTask):
         self.model.eval()
 
     def val(self):
-        results = self.predict(self.val_dataloader)
+        results = self.predict(self.val_dataloader, split="val")
 
         anom_scores = self.score_anomalies(results.anomaly_preds, results.anomaly_labels)
         recon_scores = self.score(results.recon_preds, results.recon_targets)
-        scores = anom_scores | recon_scores
+        thresholds = {"anomaly_quantile": results.anomaly_quantile, "anomaly_threshold": results.anomaly_threshold}
+        scores = anom_scores | recon_scores | thresholds
         scores = {f"val/{metric}": value for metric, value in scores.items()}
         self.log_scores(scores)
 
         return scores
 
     def test(self):
-        results = self.predict(self.test_dataloader)
+        results = self.predict(self.test_dataloader, split="test")
 
         anom_scores = self.score_anomalies(results.anomaly_preds, results.anomaly_labels)
         recon_scores = self.score(results.recon_preds, results.recon_targets)
-        scores = anom_scores | recon_scores
+        thresholds = {"anomaly_quantile": results.anomaly_quantile, "anomaly_threshold": results.anomaly_threshold}
+        scores = anom_scores | recon_scores | thresholds
         scores = {f"test/{metric}": value for metric, value in scores.items()}
         self.log_scores(scores)
 
         return scores
 
-    def predict(self, dataloader):
+    def predict(self, dataloader, split=None):
         self.model.eval()
 
         dataset = dataloader.dataset
@@ -119,11 +121,15 @@ class AnomalyDetectionTask(BaseTask):
             scores = scores / mean_scores.unsqueeze(0)
         scores = scores.nanmean(dim=1)
 
-        if self.task_config.threshold == "optimize":
-            quantile = optimize_threshold(scores, labels)
-            print(f"Optimal threshold quantile: {1 - quantile}")
-        else:
-            quantile = 1 - self.task_config.threshold
+        match self.task_config.threshold, split:
+            case "optimize", _:
+                quantile = optimize_threshold(scores, labels)
+            case "auto", "test":
+                quantile = optimize_threshold(scores, labels)
+            case "auto", _:
+                quantile = 1 - (labels.sum().item() / (n_points + self.train_dataset.n_points))
+            case q, _:
+                quantile = 1 - q
 
         threshold = scores.quantile(quantile)
         anomalies = (scores > threshold).to(torch.int)
@@ -134,7 +140,9 @@ class AnomalyDetectionTask(BaseTask):
             "recon_targets": targets,
             "anomaly_labels": labels,
             "anomaly_scores": scores,
-            "anomaly_preds": anomalies
+            "anomaly_preds": anomalies,
+            "anomaly_quantile": quantile,
+            "anomaly_threshold": threshold.item(),
         }
         return dict_to_object(results)
 
@@ -167,29 +175,30 @@ class AnomalyDetectionTask(BaseTask):
                 raise ValueError(f"Invalid loss function selection: {self.config.training.loss}")
         return self.loss_fn
 
+@torch.jit.script
 def adjust_anomalies(pred, gt):
-    pred = pred.clone()
-    anomaly_state = False
-    for i in range(len(gt)):
-        if gt[i] == 1 and pred[i] == 1 and not anomaly_state:
-            anomaly_state = True
-            for j in range(i, 0, -1):
-                if gt[j] == 0:
-                    break
-                else:
-                    if pred[j] == 0:
-                        pred[j] = 1
-            for j in range(i, len(gt)):
-                if gt[j] == 0:
-                    break
-                else:
-                    if pred[j] == 0:
-                        pred[j] = 1
-        elif gt[i] == 0:
-            anomaly_state = False
-        if anomaly_state:
-            pred[i] = 1
-    return pred
+    with torch.no_grad():
+        anomaly_state = False
+        for i in range(len(gt)):
+            if gt[i] == 1 and pred[i] == 1 and not anomaly_state:
+                anomaly_state = True
+                for j in range(i, 0, -1):
+                    if gt[j] == 0:
+                        break
+                    else:
+                        if pred[j] == 0:
+                            pred[j] = 1
+                for j in range(i, len(gt)):
+                    if gt[j] == 0:
+                        break
+                    else:
+                        if pred[j] == 0:
+                            pred[j] = 1
+            elif gt[i] == 0:
+                anomaly_state = False
+            if anomaly_state:
+                pred[i] = 1
+        return pred
 
 def optimize_threshold(scores, labels):
     def score_func(q):
