@@ -45,6 +45,7 @@ class AnomalyDetectionTask(BaseTask):
 
             val_scores = self.val()
             self.log_epoch(val_scores)
+            self.scheduler.step()
 
         self.model.eval()
 

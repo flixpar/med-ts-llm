@@ -152,7 +152,7 @@ class GPT4TS(nn.Module):
         B, L, M = x_enc.shape
 
         # Normalization from Non-stationary Transformer
-        seg_num = 25
+        seg_num = 1
         x_enc = rearrange(x_enc, "b (n s) m -> b n s m", s=seg_num)
         means = x_enc.mean(2, keepdim=True).detach()
         x_enc = x_enc - means
