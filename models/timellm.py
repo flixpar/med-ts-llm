@@ -74,6 +74,8 @@ class TimeLLM(nn.Module):
                 pass
             case "merge-end":
                 self.feature_weighting = nn.Linear(self.n_features * self.n_outputs_per_step, self.n_outputs_per_step)
+            case "weighted-average":
+                self.feature_weighting = nn.Linear(self.n_features, 1)
             case "add":
                 pass
             case _:
@@ -233,6 +235,11 @@ class TimeLLM(nn.Module):
         if self.covariate_mode == "add":
             enc_out = enc_out.reshape(bs, n_features, self.n_patches, self.d_llm)
             enc_out = enc_out.mean(dim=1)                           # [bs, n_patches, d_llm]
+        elif self.covariate_mode == "weighted-average":
+            enc_out = enc_out.reshape(bs, n_features, self.n_patches, self.d_llm)
+            enc_out = enc_out.permute(0, 2, 3, 1)                     # [bs, n_patches, d_llm, n_features]
+            enc_out = self.feature_weighting(enc_out)                 # [bs, n_patches, d_llm, 1]
+            enc_out = enc_out.squeeze(-1)                             # [bs, n_patches, d_llm]
         elif self.covariate_mode == "interleave":
             enc_out = enc_out.reshape(bs, n_features, -1, self.d_llm) # [bs, n_features, n_patches, d_llm]
             enc_out = enc_out.permute(0, 2, 1, 3)                     # [bs, n_patches, n_features, d_llm]
