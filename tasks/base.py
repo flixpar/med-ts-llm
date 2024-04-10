@@ -157,7 +157,12 @@ class BaseTask(ABC):
 
     def build_dataloaders(self):
         num_workers = self.config.setup.num_workers
-        num_workers = os.cpu_count()//4 if num_workers == "auto" else num_workers
+        if num_workers == "auto":
+            if n_cpu := os.environ.get("SLURM_CPUS_ON_NODE"):
+                num_workers = int(n_cpu) // 2
+            else:
+                num_workers = os.cpu_count() // 2
+
         self.train_dataloader = DataLoader(
             self.train_dataset,
             batch_size = self.config.training.batch_size,
