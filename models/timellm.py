@@ -254,8 +254,11 @@ class TimeLLM(nn.Module):
             if self.covariate_mode == "independent" or self.covariate_mode == "merge-end":
                 prompt_embeddings = prompt_embeddings.repeat_interleave(n_features, dim=0)
 
-            llm_enc_out = torch.cat([prompt_embeddings, enc_out], dim=1)
-            dec_out = self.llm(inputs_embeds=llm_enc_out).last_hidden_state  # [bs, n_tok + n_patches, d_llm]
+            if self.llm.config.is_encoder_decoder:
+                dec_out = self.llm(inputs_embeds=prompt_embeddings, decoder_inputs_embeds=enc_out).last_hidden_state  # [bs, n_tok + n_patches, d_llm]
+            else:
+                llm_enc_out = torch.cat([prompt_embeddings, enc_out], dim=1)
+                dec_out = self.llm(inputs_embeds=llm_enc_out).last_hidden_state  # [bs, n_tok + n_patches, d_llm]
             dec_out = dec_out.to(x_enc.dtype)
         else:
             dec_out = self.llm_replacement(enc_out)
