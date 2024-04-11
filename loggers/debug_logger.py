@@ -27,3 +27,6 @@ class DebugLogger(BaseLogger):
 
     def save_state(self, name):
         pass
+
+    def update_config(self, cfg):
+        print("Config updated:", cfg)

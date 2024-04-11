@@ -39,6 +39,19 @@ class BaseLogger(ABC):
         }
         torch.save(state, modeldir / f"{name}.pt")
 
+    def update_config(self, cfg):
+        if not isinstance(cfg, dict):
+            cfg = cfg.to_dict()
+
+        if (self.logdir / "config-updates.toml").exists():
+            with open(self.logdir / "config-updates.toml", "r") as f:
+                cfg = toml.load(f) | cfg
+
+        with open(self.logdir / "config-updates.toml", "w") as f:
+            toml.dump(cfg, f)
+        with open(self.logdir / "config-updates.json", "w") as f:
+            json.dump(cfg, f, indent="\t")
+
     @abstractmethod
     def log_end(self):
         pass

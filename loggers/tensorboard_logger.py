@@ -20,3 +20,7 @@ class TensorboardLogger(BaseLogger):
         scores = scores | kwscores
         for key, value in scores.items():
             self.logger.add_scalar(key, value, self.trainer.step)
+
+    def update_config(self, cfg):
+        super().update_config(cfg)
+        self.logger.add_hparams(flatten_dict(cfg), {}, run_name=".")

@@ -23,3 +23,7 @@ class PrintLogger(BaseLogger):
         if len(scores) == 1 and "train/loss" in scores:
             return
         print(f"Epoch: {self.trainer.epoch}, step: {self.trainer.step}, scores: {scores}")
+
+    def update_config(self, cfg):
+        super().update_config(cfg)
+        print("Config updated:", cfg)
