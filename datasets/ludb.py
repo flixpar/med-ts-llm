@@ -16,7 +16,7 @@ from .base import (
 class LUDBDataset(BaseDataset, ABC):
 
     supported_tasks = ["forecasting", "reconstruction", "semantic_segmentation"]
-    description = "LUDB is an ECG signal database with marked boundaries and peaks of P, T waves and QRS complexes. Cardiologists manually annotated all 200 records of healthy and sick patients which contains a corresponding diagnosis. This can be used for ECG delineation."
+    description = "LUDB is an ECG signal database collected from subjects with various cardiovascular diseases used for ECG delineation. Cardiologists manually annotated boundaries of P, T waves and QRS complexes. Each clip consists of a 10 second signal from a single ECG lead, sampled at 500Hz."
 
     def get_data(self, split=None):
         split = split or self.split
@@ -41,12 +41,12 @@ class LUDBDataset(BaseDataset, ABC):
         clip_ids = data.clip_id.values.astype(int)
 
         lead_descriptions = dict(enumerate(lead_cats))
-        lead_descriptions = {k: f"ECG Lead: {v}" for k, v in lead_descriptions.items()}
+        lead_descriptions = {k: f"ECG lead: {v}" for k, v in lead_descriptions.items()}
 
-        desc_fn = "train_data_desc.csv" if split == "train" else "test_data_desc.csv"
+        desc_fn = "train_data_desc_cleaned.csv" if split == "train" else "test_data_desc_cleaned.csv"
         patient_descriptions = pd.read_csv(basepath / desc_fn, index_col=0)
         patient_descriptions = patient_descriptions["data_desc"].to_dict()
-        patient_descriptions = {k: "Patient information: " + v for k, v in patient_descriptions.items()}
+        patient_descriptions = {k: f"Patient information: {v}" for k, v in patient_descriptions.items()}
 
         descriptions = {(p*100)+l: dp + "; " + dl for (p,dp) in patient_descriptions.items() for (l,dl) in lead_descriptions.items()}
 
@@ -66,7 +66,8 @@ class LUDBSemanticSegmentationDataset(LUDBDataset, ClipDataset, SemanticSegmenta
 
     def __init__(self, config, split):
         super().__init__(config, split)
-        assert self.dataset_config.version == "v2"
+        assert self.dataset_config.version == "v3"
+        self.task_description = "Segment the following ECG signal into P waves, T waves, and QRS complexes."
 
     def __getitem__(self, idx):
         idx_range = self.inverse_index(idx)
