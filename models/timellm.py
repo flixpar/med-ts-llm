@@ -32,7 +32,7 @@ class TimeLLM(nn.Module):
         self.seq_len = self.config.history_len
 
         self.task = self.config.task
-        self.task_description = self.get_task_description()
+        self.task_description = self.get_task_description(dataset)
         self.dataset_description = dataset.description
 
         self.d_ff = self.model_config.d_ff
@@ -400,7 +400,11 @@ class TimeLLM(nn.Module):
 
         return prompts
 
-    def get_task_description(self):
+    def get_task_description(self, dataset):
+        if getattr(dataset, "task_description", None) is not None:
+            self.task_description = dataset.task_description
+            return self.task_description
+
         if self.task == "forecasting" or self.task == "pretraining":
             self.task_description = f"Forecast the next {self.pred_len} steps given the previous {self.seq_len} steps of data."
         elif self.task == "anomaly_detection" or self.task == "reconstruction":
@@ -411,6 +415,7 @@ class TimeLLM(nn.Module):
             self.task_description = f"Identify the change points in the past {self.seq_len} steps of data to segment the sequence."
         else:
             raise ValueError(f"Task {self.task} is not supported.")
+
         return self.task_description
 
     def load_pretrained(self, saved_state):
