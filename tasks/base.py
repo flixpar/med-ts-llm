@@ -51,6 +51,7 @@ class BaseTask(ABC):
         self.best_score = float("inf") if (metric_dir == "min") else float("-inf")
 
         self.logger = get_logger(self, self.config, self.newrun)
+        signal.signal(signal.SIGUSR1, self.handle_termination)
 
     @abstractmethod
     def train(self):
@@ -257,6 +258,12 @@ class BaseTask(ABC):
             assert self.dtype == torch.float32, "Fedformer only supports float32 dtype"
 
         return self.dtype
+
+    def handle_termination(self, signum, frame):
+        print("Interrupted!")
+        self.logger.save_state("latest")
+        self.log_end()
+        exit(0)
 
     @classmethod
     def from_run_id(cls, run_id, cfg=None, ckpt="latest"):
