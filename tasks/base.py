@@ -220,7 +220,8 @@ class BaseTask(ABC):
             (metric_dir == "max") and (scores[metric] > self.best_score)
         ):
             self.best_score = scores[metric]
-            self.logger.save_state("best")
+            if self.config.training.get("save_best", True):
+                self.logger.save_state("best")
 
         if self.epoch < self.config.training.epochs:
             self.epoch += 1

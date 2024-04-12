@@ -155,7 +155,7 @@ class TimeLLM(nn.Module):
             attn_implementation = attn_implementation,
             cache_dir = cache_dir,
             trust_remote_code = True,
-            device_map = "auto",
+            # device_map = "auto",
         )
 
         tokenizer = AutoTokenizer.from_pretrained(
@@ -172,8 +172,11 @@ class TimeLLM(nn.Module):
             tokenizer.pad_token = pad_token
 
         self.word_embeddings = llm.get_input_embeddings().weight
-        self.vocab_size = self.word_embeddings.shape[0]
+        if self.word_embeddings.size(0) > 100_000:
+            inds = torch.linspace(0, self.word_embeddings.size(0)-1, 100_000, dtype=torch.long)
+            self.word_embeddings = nn.Parameter(self.word_embeddings[inds,:])
 
+        self.vocab_size = self.word_embeddings.shape[0]
         self.d_llm = llm_config.hidden_size
 
         if self.llm_enabled:
