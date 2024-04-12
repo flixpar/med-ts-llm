@@ -1,4 +1,5 @@
 import wandb
+from pathlib import Path
 
 from .base_logger import BaseLogger
 from utils import get_logging_tags, summarize_config
@@ -20,7 +21,7 @@ class WandBLogger(BaseLogger):
             job_type = "training",
             mode = "online" if not self.config.DEBUG else "disabled",
         )
-        self.logger.log_code()
+        self.log_code()
 
     def log_end(self):
         self.logger.finish()
@@ -31,3 +32,22 @@ class WandBLogger(BaseLogger):
     def update_config(self, cfg):
         super().update_config(cfg)
         self.logger.config.update(cfg)
+
+    def log_code(self):
+        basepath = Path(__file__).parent.parent
+        excluded_dirs = [
+            basepath / ".wandb",
+            basepath / "wandb",
+            basepath / ".venv",
+            basepath / "tmp",
+            basepath / "backup",
+        ]
+
+        def exclude_fn(path, root):
+            path = Path(root) / path
+            for excluded_dir in excluded_dirs:
+                if excluded_dir in path.parents:
+                    return True
+            return False
+
+        self.logger.log_code(exclude_fn=exclude_fn)
