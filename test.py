@@ -1,15 +1,17 @@
 import sys
+from pathlib import Path
 import toml
 
 from tasks import task_lookup
 
 
-def main(run_id, split="test", save_id=None):
-    config = toml.load(f"outputs/logs/{run_id}/config.toml")
+def main(run_id, split="test", save_id=None, _basepath=None):
+    basepath = Path(_basepath) if _basepath is not None else (Path(__file__).parent / "outputs/logs/")
+    config = toml.load(basepath / run_id / "config.toml")
     task = config["task"]
 
     task_cls = task_lookup[task]
-    trainer = task_cls.from_run_id(run_id, ckpt=save_id)
+    trainer = task_cls.from_run_id(run_id, ckpt=save_id, basepath=_basepath)
 
     if split == "test":
         test_scores = trainer.test()
@@ -29,5 +31,7 @@ if __name__ == "__main__":
             main(run_id, split)
         case [_, run_id, split, save_id]:
             main(run_id, split, save_id)
+        case [_, run_id, split, save_id, basepath]:
+            main(run_id, split, save_id, basepath)
         case _:
             raise ValueError("Invalid number of arguments")

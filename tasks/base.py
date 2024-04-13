@@ -266,10 +266,13 @@ class BaseTask(ABC):
         exit(0)
 
     @classmethod
-    def from_run_id(cls, run_id, cfg=None, ckpt="latest"):
+    def from_run_id(cls, run_id, cfg=None, ckpt="latest", basepath=None):
         ckpt = ckpt or "latest"
+        if basepath is None:
+            basepath = Path(__file__).parent / f"../outputs/logs/{run_id}/"
+        else:
+            basepath = Path(basepath) / run_id
 
-        basepath = Path(__file__).parent / f"../outputs/logs/{run_id}/"
         config = toml.load(basepath / "config.toml")
         if cfg is not None:
             config = config | cfg
