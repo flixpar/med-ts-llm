@@ -112,10 +112,12 @@ class TimeLLM(nn.Module):
         if cache_dir == "" or cache_dir == "none":
             cache_dir = None
 
+        trust_remote_code = (self.llm_id != "microsoft/phi-2")
+
         llm_config = AutoConfig.from_pretrained(
             self.llm_id,
             cache_dir = cache_dir,
-            trust_remote_code = True,
+            trust_remote_code = trust_remote_code,
         )
         if self.llm_layers > 0 and self.llm_layers < llm_config.num_hidden_layers:
             llm_config.num_hidden_layers = self.llm_layers
@@ -154,14 +156,14 @@ class TimeLLM(nn.Module):
             torch_dtype = model_dtype,
             attn_implementation = attn_implementation,
             cache_dir = cache_dir,
-            trust_remote_code = True,
+            trust_remote_code = trust_remote_code,
             # device_map = "auto",
         )
 
         tokenizer = AutoTokenizer.from_pretrained(
             self.llm_id,
             cache_dir = cache_dir,
-            trust_remote_code = True,
+            trust_remote_code = trust_remote_code,
         )
 
         if tokenizer.eos_token:
@@ -194,7 +196,8 @@ class TimeLLM(nn.Module):
             for k in llm_keys:
                 del state_dict[k]
 
-        del state_dict["word_embeddings"]
+        if "word_embeddings" in state_dict:
+            del state_dict["word_embeddings"]
 
         return state_dict
 
