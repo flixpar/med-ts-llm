@@ -2,6 +2,7 @@ numpy >= 1.22.0
 pandas >= 2.0.0
 plotly >= 5.19.0
 matplotlib
+plotly
 tqdm
 toml
 
@@ -9,13 +10,11 @@ torch >= 2.2.1
 torchvision
 
 transformers >= 4.39.0
+bitsandbytes
 
 einops >= 0.7.0
 pytorch-optimizer >= 2.11.0
 reformer-pytorch >= 1.4.4
-
-causal-conv1d >= 1.2.0
-mamba-ssm >= 1.2.0
 
 scikit-learn >= 1.4.0
 bayesian-optimization >= 1.4.0

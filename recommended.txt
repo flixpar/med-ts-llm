@@ -1,0 +1,7 @@
+wheel
+packaging
+
+flash-attn
+
+causal-conv1d >= 1.2.0
+mamba-ssm >= 1.2.0
