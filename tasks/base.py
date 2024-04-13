@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 import toml, json
 import os
+import signal
 
 import torch
 import torch.nn as nn
@@ -117,7 +118,7 @@ class BaseTask(ABC):
             case _:
                 raise ValueError(f"Invalid scheduler selection: {scheduler_type}")
 
-        if ("finetuning" in self.config) and self.config.finetuning.enabled and (self.config.finetuning.frozen_epochs > 0):
+        if self.finetuning and (self.config.finetuning.frozen_epochs > 0):
             assert scheduler_type in ["none", "constant", None], "Frozen epochs only supported with constant scheduler"
             self.scheduler = FineTuningScheduler(
                 self.optimizer,
@@ -129,26 +130,22 @@ class BaseTask(ABC):
 
     def load_pretrained(self):
         if ("finetuning" not in self.config) or (not self.config.finetuning.enabled):
+            self.finetuning = False
             return
 
         assert self.config.model == "timellm", "Only TimeLLM supports finetuning"
 
         cfg = self.config.finetuning
+        self.finetuning = True
 
         pretrained_path = Path(__file__).parent / f"../outputs/logs/{cfg.pretrained_id}/checkpoints/{cfg.pretrained_ckpt}.pt"
         saved_state = torch.load(pretrained_path)["model"]
-        loaded_params = self.model.load_pretrained(saved_state)
+        self.loaded_params = self.model.load_pretrained(saved_state)
 
-        if cfg.freeze_forever:
+        assert not (cfg.freeze_forever and (cfg.frozen_epochs > 0))
+        if cfg.freeze_forever or cfg.frozen_epochs > 0:
             for name, param in self.model.named_parameters():
-                if name in loaded_params:
-                    param.requires_grad = False
-
-        if cfg.frozen_epochs > 0:
-            assert not cfg.freeze_forever, "Cannot freeze forever and then unfreeze"
-            self.loaded_params = loaded_params
-            for name, param in self.model.named_parameters():
-                if name in loaded_params:
+                if name in self.loaded_params:
                     param.requires_grad = False
 
     def build_datasets(self):
