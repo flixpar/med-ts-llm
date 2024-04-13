@@ -24,6 +24,7 @@ class AnomalyDetectionTask(BaseTask):
         self.task = "anomaly_detection"
         self.task_config = config.tasks.anomaly_detection
         assert config.history_len == config.pred_len, "Anomaly detection task requires history_len == pred_len"
+        assert self.task_config.get("score_metric", "mse") == "mse"
         super(AnomalyDetectionTask, self).__init__(run_id, config, newrun)
 
     def train(self):
@@ -121,16 +122,21 @@ class AnomalyDetectionTask(BaseTask):
             mean_scores = scores.mean(dim=0)
             scores = scores / mean_scores.unsqueeze(0)
         scores = scores.nanmean(dim=1)
+        if (window := self.task_config.get("normalize_moving_window", 0)) > 0:
+            moving_avg = running_mean(scores, window)
+            scores = scores / moving_avg
 
         match self.task_config.threshold, split:
             case "optimize", _:
                 quantile = optimize_threshold(scores, labels)
-            case "auto", "test":
+            case "optimize-test", "test":
                 quantile = optimize_threshold(scores, labels)
-            case "auto", _:
+            case ("auto" | "optimize-test"), _:
                 quantile = 1 - (labels.sum().item() / (n_points + self.train_dataset.n_points))
-            case q, _:
-                quantile = 1 - q
+            case float(), _:
+                quantile = 1 - self.task_config.threshold
+            case _:
+                raise ValueError(f"Invalid threshold selection: {self.task_config.threshold}")
 
         threshold = scores.quantile(quantile)
         anomalies = (scores > threshold).to(torch.int)
@@ -200,6 +206,13 @@ def adjust_anomalies(pred, gt):
             if anomaly_state:
                 pred[i] = 1
         return pred
+
+def running_mean(xs, window_size):
+    if window_size % 2 == 0:
+        window_size += 1
+    kernel = torch.ones(1, 1, window_size) / window_size
+    xs = F.conv1d(xs.view(1, 1, -1), kernel, stride=1, padding="same").squeeze()
+    return xs
 
 def optimize_threshold(scores, labels):
     def score_func(q):
