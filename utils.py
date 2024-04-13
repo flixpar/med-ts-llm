@@ -51,9 +51,23 @@ def summarize_config(config):
     config = deepcopy(config.to_dict())
 
     model = config["model"]
-    model_config = config["models"][model]
-    config[model] = model_config
-    del config["models"]
+    task = config["task"]
+    dataset = config["data"]["dataset"]
+
+    if model in config["models"]:
+        model_config = config["models"][model]
+        config[model] = model_config
+        del config["models"]
+
+    if "tasks" in config:
+        for t in config["tasks"]:
+            if t != task:
+                del config["tasks"][t]
+
+    if "datasets" in config:
+        for d in config["datasets"]:
+            if d != dataset:
+                del config["datasets"][d]
 
     return config
 
