@@ -1,6 +1,8 @@
 import torch
 import torch.nn.functional as F
 
+import pytorch_optimizer
+
 import plotly.graph_objects as go
 
 from sklearn.metrics import (
@@ -119,17 +121,19 @@ class SemanticSegmentationTask(BaseTask):
         return preds, targets
 
     def build_loss(self):
-            is_binary = (self.train_dataset.n_classes == 2)
-            match self.config.training.loss, is_binary:
-                case "bce", True:
-                    self.loss_fn = torch.nn.BCEWithLogitsLoss()
-                case ("ce", False) | ("cross_entropy", False):
-                    self.loss_fn = torch.nn.CrossEntropyLoss()
-                case ("ce", True) | ("cross_entropy", True):
-                    self.loss_fn = torch.nn.BCEWithLogitsLoss()
-                case _:
-                    raise ValueError(f"Invalid loss function selection: {self.config.training.loss}")
-            return self.loss_fn
+        is_binary = (self.train_dataset.n_classes == 2)
+        match self.config.training.loss, is_binary:
+            case ("bce" | "ce" | "cross_entropy" | "auto"), True:
+                self.loss_fn = torch.nn.BCEWithLogitsLoss()
+            case ("ce" | "cross_entropy" | "auto"), False:
+                self.loss_fn = torch.nn.CrossEntropyLoss()
+            case ("iou" | "jaccard"), b:
+                self.loss_fn = pytorch_optimizer.JaccardLoss("binary" if b else "multiclass")
+            case ("lovasz" | "lovasz-hinge"), True:
+                self.loss_fn = pytorch_optimizer.LovaszHingeLoss(False)
+            case _:
+                raise ValueError(f"Invalid loss function selection: {self.config.training.loss}")
+        return self.loss_fn
 
     def score(self, pred_scores, target):
         avg_mode = "binary" if pred_scores.size(1) == 2 else "macro"
