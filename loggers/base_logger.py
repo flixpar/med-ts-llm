@@ -59,3 +59,6 @@ class BaseLogger(ABC):
     @abstractmethod
     def log_scores(self, scores={}, **kwscores):
         pass
+
+    def log_figure(self, fig, name):
+        pass

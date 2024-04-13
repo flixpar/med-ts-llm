@@ -29,6 +29,9 @@ class WandBLogger(BaseLogger):
     def log_scores(self, scores={}, **kwscores):
         self.logger.log({"epoch": self.trainer.epoch, "step": self.trainer.step} | scores | kwscores)
 
+    def log_figure(self, fig, name):
+        self.logger.log({name: fig})
+
     def update_config(self, cfg):
         super().update_config(cfg)
         self.logger.config.update(cfg)

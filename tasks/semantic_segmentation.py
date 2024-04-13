@@ -1,6 +1,8 @@
 import torch
 import torch.nn.functional as F
 
+import plotly.graph_objects as go
+
 from sklearn.metrics import (
     accuracy_score,
     f1_score,
@@ -50,16 +52,26 @@ class SemanticSegmentationTask(BaseTask):
 
     def val(self):
         preds, targets = self.predict(self.val_dataloader)
+
         scores = self.score(preds, targets)
         scores = {f"val/{metric}": value for metric, value in scores.items()}
         self.log_scores(scores)
+
+        preds_fig = self.plot_predictions(preds, targets)
+        self.logger.log_figure(preds_fig, "val/predictions")
+
         return scores
 
     def test(self):
         preds, targets = self.predict(self.test_dataloader)
+
         scores = self.score(preds, targets)
         scores = {f"test/{metric}": value for metric, value in scores.items()}
         self.log_scores(scores)
+
+        preds_fig = self.plot_predictions(preds, targets)
+        self.logger.log_figure(preds_fig, "test/predictions")
+
         return scores
 
     def predict(self, dataloader):
@@ -130,3 +142,18 @@ class SemanticSegmentationTask(BaseTask):
             "recall": recall_score(target, pred, average=avg_mode, zero_division=0),
             "iou": jaccard_score(target, pred, average=avg_mode, zero_division=0),
         }
+
+    def plot_predictions(self, pred_scores, targets, xrange=(0, 1000)):
+        xinds = slice(*xrange)
+        preds = pred_scores.argmax(dim=1).int()
+
+        if pred_scores.size(1) == 2:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=torch.arange(*xrange), y=targets[xinds], mode="lines", name="target"))
+            fig.add_trace(go.Scatter(x=torch.arange(*xrange), y=pred_scores[xinds, 1], mode="lines", name="pred"))
+        else:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=torch.arange(*xrange), y=targets[xinds], mode="lines", name="target"))
+            fig.add_trace(go.Scatter(x=torch.arange(*xrange), y=preds[xinds], mode="lines", name="pred"))
+
+        return fig
