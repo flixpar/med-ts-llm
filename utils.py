@@ -60,12 +60,12 @@ def summarize_config(config):
         del config["models"]
 
     if "tasks" in config:
-        for t in config["tasks"]:
+        for t in list(config["tasks"].keys()):
             if t != task:
                 del config["tasks"][t]
 
     if "datasets" in config:
-        for d in config["datasets"]:
+        for d in list(config["datasets"].keys()):
             if d != dataset:
                 del config["datasets"][d]
 
