@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, default_collate
 import pytorch_optimizer
 
 from models import model_lookup
@@ -167,9 +167,15 @@ class BaseTask(ABC):
             else:
                 num_workers = os.cpu_count() // 2
 
+        if hasattr(self.train_dataset, "collate_fn"):
+            collate_fn = self.train_dataset.collate_fn
+        else:
+            collate_fn = default_collate
+
         self.train_dataloader = DataLoader(
             self.train_dataset,
             batch_size = self.config.training.batch_size,
+            collate_fn = collate_fn,
             shuffle = True,
             num_workers = num_workers,
             pin_memory = True,
@@ -177,6 +183,7 @@ class BaseTask(ABC):
         self.val_dataloader = DataLoader(
             self.val_dataset,
             batch_size = self.config.training.batch_size,
+            collate_fn = collate_fn,
             shuffle = False,
             num_workers = num_workers,
             pin_memory = True,
@@ -184,19 +191,24 @@ class BaseTask(ABC):
         self.test_dataloader = DataLoader(
             self.test_dataset,
             batch_size = self.config.training.batch_size,
+            collate_fn = collate_fn,
             shuffle = False,
             num_workers = num_workers,
             pin_memory = True,
         )
 
     def prepare_batch(self, batch):
-        for k, v in batch.items():
-            if isinstance(v, torch.Tensor):
-                v = v.to(self.device)
-                if v.dtype.is_floating_point:
-                    v = v.to(self.dtype)
-                batch[k] = v
-        return batch
+        if isinstance(batch, dict):
+            return {k: self.prepare_batch(v) for k, v in batch.items()}
+        elif isinstance(batch, list) or isinstance(batch, tuple):
+            return [self.prepare_batch(x) for x in batch]
+        elif isinstance(batch, torch.Tensor):
+            batch = batch.to(self.device)
+            if batch.dtype.is_floating_point:
+                batch = batch.to(self.dtype)
+            return batch
+        else:
+            return batch
 
     def log_end(self):
         self.logger.log_end()
