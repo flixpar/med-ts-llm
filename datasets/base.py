@@ -257,54 +257,54 @@ class SegmentationDataset(BaseDataset, ABC):
 
 
 class ClipDataset(BaseDataset, ABC):
-        clip_dataset = True
+    clip_dataset = True
 
-        def __init__(self, config, split):
-            super().__init__(config, split)
+    def __init__(self, config, split):
+        super().__init__(config, split)
 
-            assert not self.task == "forecasting", "ClipDataset does not support forecasting"
+        assert not self.task == "forecasting", "ClipDataset does not support forecasting"
 
-            assert self.clip_ids is not None
-            assert (self.clip_ids.diff() >= 0).all()
+        assert self.clip_ids is not None
+        assert (self.clip_ids.diff() >= 0).all()
 
-            clips, self.clip_inds, self.clip_lens = self.clip_ids.unique_consecutive(return_inverse=True, return_counts=True)
-            self.clips = torch.arange(len(clips))
+        clips, self.clip_inds, self.clip_lens = self.clip_ids.unique_consecutive(return_inverse=True, return_counts=True)
+        self.clips = torch.arange(len(clips))
 
-            assert (clips == self.clip_ids.unique()).all()
+        assert (clips == self.clip_ids.unique()).all()
 
-            self.clip_lens_cumsum = self.clip_lens.cumsum(0)
-            self.clip_lens_cumsum = torch.cat([torch.tensor([0]), self.clip_lens_cumsum])
+        self.clip_lens_cumsum = self.clip_lens.cumsum(0)
+        self.clip_lens_cumsum = torch.cat([torch.tensor([0]), self.clip_lens_cumsum])
 
-            self.clip_segs = (self.clip_lens - self.pred_len) // self.step_size + 1
+        self.clip_segs = (self.clip_lens - self.pred_len) // self.step_size + 1
 
-            self.clip_segs_cumsum = self.clip_segs.cumsum(0)
-            self.clip_segs_cumsum = torch.cat([torch.tensor([0]), self.clip_segs_cumsum])
+        self.clip_segs_cumsum = self.clip_segs.cumsum(0)
+        self.clip_segs_cumsum = torch.cat([torch.tensor([0]), self.clip_segs_cumsum])
 
-            self.dataset_len = self.clip_segs_cumsum[-1].item()
+        self.dataset_len = self.clip_segs_cumsum[-1].item()
 
-            clip_pts = ((self.clip_segs - 1) * self.step_size) + self.pred_len
-            clip_remainder = self.clip_lens - clip_pts
-            assert (clip_remainder >= 0).all()
+        clip_pts = ((self.clip_segs - 1) * self.step_size) + self.pred_len
+        clip_remainder = self.clip_lens - clip_pts
+        assert (clip_remainder >= 0).all()
 
-            clip_mask = ((torch.arange(clip_pts.max()) % self.step_size) // self.pred_len) == 0
-            mask_1s = [clip_mask[:l] for l in clip_pts]
-            mask_0s = [torch.zeros(r, dtype=torch.bool) for r in clip_remainder]
-            mask = [torch.cat([m1, m0]) for m1, m0 in zip(mask_1s, mask_0s)]
-            self.mask = torch.cat(mask)
+        clip_mask = ((torch.arange(clip_pts.max()) % self.step_size) // self.pred_len) == 0
+        mask_1s = [clip_mask[:l] for l in clip_pts]
+        mask_0s = [torch.zeros(r, dtype=torch.bool) for r in clip_remainder]
+        mask = [torch.cat([m1, m0]) for m1, m0 in zip(mask_1s, mask_0s)]
+        self.mask = torch.cat(mask)
 
-            assert len(self.mask) == self.n_points
+        assert len(self.mask) == self.n_points
 
-        def __len__(self):
-            return self.dataset_len
+    def __len__(self):
+        return self.dataset_len
 
-        def inverse_index(self, seg_idx):
-            clip_idx = torch.searchsorted(self.clip_segs_cumsum, seg_idx, right=True).item() - 1
+    def inverse_index(self, seg_idx):
+        clip_idx = torch.searchsorted(self.clip_segs_cumsum, seg_idx, right=True).item() - 1
 
-            clip_seg_idx = seg_idx - self.clip_segs_cumsum[clip_idx].item()
-            clip_start = self.clip_lens_cumsum[clip_idx].item()
+        clip_seg_idx = seg_idx - self.clip_segs_cumsum[clip_idx].item()
+        clip_start = self.clip_lens_cumsum[clip_idx].item()
 
-            seg_start = clip_start + (clip_seg_idx * self.step_size)
-            seg_end = seg_start + self.pred_len
-            seg_range = (seg_start, seg_end)
+        seg_start = clip_start + (clip_seg_idx * self.step_size)
+        seg_end = seg_start + self.pred_len
+        seg_range = (seg_start, seg_end)
 
-            return seg_range
+        return seg_range
