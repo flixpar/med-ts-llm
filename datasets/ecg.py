@@ -15,12 +15,16 @@ class ECGMITDataset(BaseDataset, ABC):
     supported_tasks = ["forecasting", "reconstruction", "anomaly_detection", "segmentation"]
     description = "The MIT-BIH Arrhythmia Database contains excerpts of two-channel ambulatory ECG from a mixed population of inpatients and outpatients, digitized at 360 samples per second per channel with 11-bit resolution over a 10 mV range."
 
+    def __init__(self, config, split):
+        super().__init__(config, split)
+        assert self.dataset_config.version == "v2"
+
 
 class ECGMITForecastingDataset(ECGMITDataset, ForecastDataset):
     def get_data(self, split=None):
         split = split or self.split
 
-        basepath = Path(__file__).parent / "../data/mit_ecg/anom/"
+        basepath = Path(__file__).parent / "../data/mit_ecg/v2/anom/"
         split_fn = "train.csv" if split == "train" else "test.csv"
         data = pd.read_csv(basepath / split_fn)
         data = data.drop(columns=["time", "patient_id"])
@@ -33,7 +37,7 @@ class ECGMITReconstructionDataset(ECGMITDataset, ReconstructionDataset):
     def get_data(self, split=None):
         split = split or self.split
 
-        basepath = Path(__file__).parent / "../data/mit_ecg/anom/"
+        basepath = Path(__file__).parent / "../data/mit_ecg/v2/anom/"
         split_fn = "train.csv" if split == "train" else "test.csv"
         data = pd.read_csv(basepath / split_fn)
         data = data.drop(columns=["time", "patient_id"])
@@ -46,27 +50,33 @@ class ECGMITAnomalyDetectionDataset(ECGMITDataset, AnomalyDetectionDataset):
     def get_data(self, split=None):
         split = split or self.split
 
-        basepath = Path(__file__).parent / "../data/mit_ecg/anom/"
+        basepath = Path(__file__).parent / "../data/mit_ecg/v2/anom/"
         split_fn = "train.csv" if split == "train" else "test.csv"
         data = pd.read_csv(basepath / split_fn)
-        data = data.drop(columns=["time", "patient_id"])
-        data = data.values
+
+        time_col = "time"
+        clip_col = "patient_id"
+        feature_cols = data.columns.difference([time_col, clip_col])
+
+        features = data[feature_cols].values
+        clip_ids = data[clip_col].values.astype(int)
 
         if split != "train":
             labels = pd.read_csv(basepath / "test_label.csv")
-            labels = labels.drop(columns=["time", "patient_id"])
-            labels = labels.values[:,0].astype(int)
+            assert (labels[time_col] == data[time_col]).all()
+            assert (labels[clip_col] == data[clip_col]).all()
+            labels = labels.label.astype(int)
         else:
             labels = None
 
-        return {"data": data, "labels": labels}
+        return {"data": features, "labels": labels, "clip_ids": clip_ids}
 
 
 class ECGMITSegmentationDataset(ECGMITDataset, SegmentationDataset):
     def get_data(self, split=None):
         split = split or self.split
 
-        basepath = Path(__file__).parent / "../data/mit_ecg/seg/"
+        basepath = Path(__file__).parent / "../data/mit_ecg/v2/seg/"
         split_fn = "train.csv" if split == "train" else "test.csv"
         data = pd.read_csv(basepath / split_fn)
 
