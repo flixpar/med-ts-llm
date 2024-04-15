@@ -239,7 +239,7 @@ class SegmentationDataset(BaseDataset, ABC):
 
     def convert_labels(self):
         if self.task_config.mode == "steps-to-boundary":
-            labels_binary = self.labels
+            labels_binary = self.labels.numpy()
             changepts = np.where(labels_binary)[0]
             changepts = np.append(changepts, len(labels_binary))
             labels = np.zeros(len(labels_binary), dtype=np.float32)
@@ -249,7 +249,7 @@ class SegmentationDataset(BaseDataset, ABC):
                 if i == changepts[0]:
                     changepts = changepts[1:]
                     seg_len = changepts[0] - i
-            self.labels = labels
+            self.labels = torch.tensor(labels)
         elif self.task_config.mode == "boundary-prediction":
             pass
         else:
