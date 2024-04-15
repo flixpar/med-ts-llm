@@ -69,7 +69,17 @@ class ECGMITAnomalyDetectionDataset(ECGMITDataset, AnomalyDetectionDataset):
         else:
             labels = None
 
-        return {"data": features, "labels": labels, "clip_ids": clip_ids}
+        desc_fn = "train_data_desc.csv" if split == "train" else "test_data_desc.csv"
+        descriptions = pd.read_csv(basepath / desc_fn, index_col=0)
+        descriptions = descriptions["data_desc"].to_dict()
+        descriptions = {k: f"Patient description: {v}" for k, v in descriptions.items()}
+
+        return {
+            "data": features,
+            "labels": labels,
+            "clip_ids": clip_ids,
+            "clip_descriptions": descriptions,
+        }
 
 
 class ECGMITSegmentationDataset(ECGMITDataset, SegmentationDataset):
@@ -102,7 +112,7 @@ class ECGMITSegmentationDataset(ECGMITDataset, SegmentationDataset):
         x = self.data[slice(*idx_range),:]
         y = self.labels[slice(*idx_range)]
 
-        clip_id = self.clip_ids[idx].item()
+        clip_id = self.clip_ids[idx_range[0]].item()
         desc = self.clip_descriptions[clip_id]
 
         return {"x_enc": x, "labels": y, "descriptions": desc}

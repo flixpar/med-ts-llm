@@ -21,6 +21,7 @@ class LUDBDataset(BaseDataset, ABC):
     def get_data(self, split=None):
         split = split or self.split
 
+        assert self.dataset_config.version == "v3"
         basepath = Path(__file__).parent / "../data/ludb/"
         split_fn = "train.csv" if split == "train" else "test.csv"
         data = pd.read_csv(basepath / split_fn)
@@ -50,7 +51,13 @@ class LUDBDataset(BaseDataset, ABC):
 
         descriptions = {(p*100)+l: dp + "; " + dl for (p,dp) in patient_descriptions.items() for (l,dl) in lead_descriptions.items()}
 
-        return {"data": features, "labels": labels, "timestamps": timestamps, "clip_ids": clip_ids, "clip_descriptions": descriptions}
+        return {
+            "data": features,
+            "labels": labels,
+            "timestamps": timestamps,
+            "clip_ids": clip_ids,
+            "clip_descriptions": descriptions,
+        }
 
 
 class LUDBForecastingDataset(LUDBDataset, ForecastDataset):
@@ -63,22 +70,7 @@ class LUDBReconstructionDataset(LUDBDataset, ReconstructionDataset):
 
 class LUDBSemanticSegmentationDataset(LUDBDataset, ClipDataset, SemanticSegmentationDataset):
     n_classes = 4
-
-    def __init__(self, config, split):
-        super().__init__(config, split)
-        assert self.dataset_config.version == "v3"
-        self.task_description = "Segment the following ECG signal into P waves, T waves, and QRS complexes."
-
-    def __getitem__(self, idx):
-        idx_range = self.inverse_index(idx)
-
-        x = self.data[slice(*idx_range),:]
-        y = self.labels[slice(*idx_range)]
-
-        clip_id = self.clip_ids[idx_range[0]].item()
-        desc = self.clip_descriptions[clip_id]
-
-        return {"x_enc": x, "labels": y, "descriptions": desc}
+    task_description = "Segment the following ECG signal into P waves, T waves, and QRS complexes."
 
 
 ludb_datasets = {

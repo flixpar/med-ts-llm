@@ -124,8 +124,13 @@ class ForecastDataset(BaseDataset, ABC):
 
         x = self.data[slice(*x_range),:]
         y = self.data[slice(*y_range),:]
+        out = {"x_enc": x, "y": y}
 
-        return {"x_enc": x, "y": y}
+        if self.clip_descriptions is not None:
+            clip_id = self.clip_ids[x_range[0]].item()
+            out["descriptions"] = self.clip_descriptions[clip_id]
+
+        return out
 
     def __len__(self):
         return (self.n_points - self.history_len - self.pred_len + 1) // self.step_size
@@ -146,8 +151,15 @@ class ReconstructionDataset(BaseDataset, ABC):
 
     def __getitem__(self, idx):
         x_range = self.inverse_index(idx)
+
         x = self.data[slice(*x_range),:]
-        return {"x_enc": x}
+        out = {"x_enc": x}
+
+        if self.clip_descriptions is not None:
+            clip_id = self.clip_ids[x_range[0]].item()
+            out["descriptions"] = self.clip_descriptions[clip_id]
+
+        return out
 
     def __len__(self):
         return (self.n_points - self.pred_len) // self.step_size + 1
@@ -167,14 +179,17 @@ class AnomalyDetectionDataset(BaseDataset, ABC):
 
     def __getitem__(self, idx):
         x_range = self.inverse_index(idx)
+
         x = self.data[slice(*x_range),:]
+        out = {"x_enc": x}
 
         if self.labels is not None:
-            labels = self.labels[slice(*x_range)]
-        else:
-            labels = x[0:0,0]
+            out["labels"] = self.labels[slice(*x_range)]
+        if self.clip_descriptions is not None:
+            clip_id = self.clip_ids[x_range[0]].item()
+            out["descriptions"] = self.clip_descriptions[clip_id]
 
-        return {"x_enc": x, "labels": labels}
+        return out
 
     def __len__(self):
         return (self.n_points - self.pred_len) // self.step_size + 1
@@ -197,8 +212,13 @@ class SemanticSegmentationDataset(BaseDataset, ABC):
 
         x = self.data[slice(*idx_range),:]
         y = self.labels[slice(*idx_range)]
+        out = {"x_enc": x, "labels": y}
 
-        return {"x_enc": x, "labels": y}
+        if self.clip_descriptions is not None:
+            clip_id = self.clip_ids[idx_range[0]].item()
+            out["descriptions"] = self.clip_descriptions[clip_id]
+
+        return out
 
     def __len__(self):
         return (self.n_points - self.pred_len) // self.step_size + 1
@@ -226,8 +246,13 @@ class SegmentationDataset(BaseDataset, ABC):
 
         x = self.data[slice(*idx_range),:]
         y = self.labels[slice(*idx_range)]
+        out = {"x_enc": x, "labels": y}
 
-        return {"x_enc": x, "labels": y}
+        if self.clip_descriptions is not None:
+            clip_id = self.clip_ids[idx_range[0]].item()
+            out["descriptions"] = self.clip_descriptions[clip_id]
+
+        return out
 
     def __len__(self):
         return (self.n_points - self.pred_len) // self.step_size + 1
