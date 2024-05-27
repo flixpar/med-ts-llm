@@ -54,8 +54,9 @@ class ForecastTask(BaseTask):
 
         dataset = dataloader.dataset
         pred_len = self.config.pred_len
+        ctx_len = self.config.history_len
         step_size = dataset.step_size
-        n_points = dataset.n_points if dataset.clip_dataset else pred_len + ((len(dataset) - 1) * step_size)
+        n_points = dataset.n_points if dataset.clip_dataset else pred_len + ctx_len + ((len(dataset) - 1) * step_size)
 
         n_features = dataset.real_features
         bs = dataloader.batch_size
@@ -71,10 +72,13 @@ class ForecastTask(BaseTask):
                 for j in range(pred.size(0)):
                     inds = dataset.inverse_index((idx * bs) + j)
                     time_inds, feature_inds = inds if dataset.univariate else (inds, slice(None))
-                    time_inds = slice(*time_inds)
+                    time_inds = slice(*time_inds[1])
 
                     preds[time_inds, feature_inds] = pred[j].squeeze().cpu().detach()
                     targets[time_inds, feature_inds] = inputs["y"][j].squeeze().cpu().detach()
+
+        preds = preds[ctx_len:]
+        targets = targets[ctx_len:]
 
         if dataset.clip_dataset:
             mask = dataset.mask
