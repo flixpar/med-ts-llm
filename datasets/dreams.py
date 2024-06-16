@@ -7,11 +7,12 @@ from .base import (
     ForecastDataset,
     ReconstructionDataset,
     AnomalyDetectionDataset,
+    SemanticSegmentationDataset,
 )
 
 
 class DreamsDataset(BaseDataset, ABC):
-    supported_tasks = ["forecasting", "reconstruction", "anomaly_detection"]
+    supported_tasks = ["forecasting", "reconstruction", "anomaly_detection", "semantic_segmentation"]
     description = "The DREAMS database consists of digital 32-channel polysomnographic recordings (PSG), acquired from patients with different pathologies in a sleep hospital laboratory. Muscle or movement artifacts on the electroencephalogram (EEG) were annotated in microevents or in sleep stages by several experts. Other provided physiological signals include multiple electrooculogram (EOG) and electromyography (EMG) channels, sampled at 200Hz."
 
     def get_cols(self, allcols):
@@ -79,9 +80,67 @@ class DreamsReconstructionDataset(DreamsDataset, ReconstructionDataset):
 class DreamsAnomalyDetectionDataset(DreamsDataset, AnomalyDetectionDataset):
     pass
 
+class DreamsSemanticSegmentationDataset(DreamsDataset, SemanticSegmentationDataset):
+
+    def get_data(self, split=None):
+        split = split or self.split
+
+        assert self.dataset_config.version == "v2"
+        basepath = Path(__file__).parent / "../data/dreams/v2/"
+        data = pd.read_csv(basepath / "test.csv")
+
+        time_col = "ts"
+        clip_col = "patient_ID"
+        allcols = data.columns.difference([time_col, clip_col])
+        feature_cols, label_col = self.get_cols(allcols)
+
+        xs = data[feature_cols].values
+        clip_ids = data[clip_col].values.astype(int)
+        timestamps = data[time_col].values
+
+        labels_df = pd.read_csv(basepath / "test_label.csv")
+        labels = labels_df[label_col].values.astype(int)
+        assert labels_df[clip_col].equals(data[clip_col])
+        assert labels_df[time_col].equals(data[time_col])
+
+        descriptions = pd.read_csv(basepath / "test_data_desc.csv", index_col=0)
+        descriptions = descriptions["data_desc"].to_dict()
+        descriptions = {k: f"Patient description: {v}" for k, v in descriptions.items()}
+
+        split_pt = int(xs.shape[0] * 0.8)
+        if split == "train":
+            xs = xs[:split_pt]
+            labels = labels[:split_pt]
+            clip_ids = clip_ids[:split_pt]
+            timestamps = timestamps[:split_pt]
+        else:
+            xs = xs[split_pt:]
+            labels = labels[split_pt:]
+            clip_ids = clip_ids[split_pt:]
+            timestamps = timestamps[split_pt:]
+
+        sf = self.dataset_config.downsample_factor
+        xs = xs[::sf]
+        labels = labels[::sf]
+        clip_ids = clip_ids[::sf]
+        timestamps = timestamps[::sf]
+
+        return {
+            "data": xs,
+            "labels": labels,
+            "clip_ids": clip_ids,
+            "clip_descriptions": descriptions,
+            "timestamps": timestamps,
+        }
+
+    @property
+    def n_classes(self):
+        return 2
+
 
 dreams_datasets = {
     "forecasting": DreamsForecastDataset,
     "reconstruction": DreamsReconstructionDataset,
     "anomaly_detection": DreamsAnomalyDetectionDataset,
+    "semantic_segmentation": DreamsSemanticSegmentationDataset,
 }
