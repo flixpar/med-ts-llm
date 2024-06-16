@@ -9,7 +9,10 @@ class TensorboardLogger(BaseLogger):
         super().__init__(trainer, config, newrun)
 
         self.logger = SummaryWriter(log_dir=self.logdir / "tensorboard")
-        self.logger.add_hparams(flatten_dict(summarize_config(self.config)), {}, run_name=".")
+
+        cfg = flatten_dict(summarize_config(self.config))
+        cfg = {k: (v if not isinstance(v, list) else ", ".join(v)) for k, v in cfg.items()}
+        self.logger.add_hparams(cfg, {}, run_name=".")
 
     def log_end(self):
         self.logger.close()
