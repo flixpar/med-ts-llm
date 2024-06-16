@@ -214,7 +214,7 @@ class GPT4TS(nn.Module):
 
         if not self.training:
             if self.num_class > 2:
-                dec_out = dec_out.reshape(B, self.pred_len, self.num_class)
+                dec_out = dec_out.reshape(B, self.seq_len, self.num_class)
                 dec_out = F.softmax(dec_out, dim=-1)
             else:
                 dec_out = torch.sigmoid(dec_out)

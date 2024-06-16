@@ -64,7 +64,7 @@ def summarize_config(config):
             if t != task:
                 del config["tasks"][t]
 
-    if "datasets" in config:
+    if "datasets" in config and config["data"]["dataset"] != "all":
         for d in list(config["datasets"].keys()):
             if d != dataset:
                 del config["datasets"][d]

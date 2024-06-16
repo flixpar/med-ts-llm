@@ -69,7 +69,7 @@ class BaseDataset(Dataset, ABC):
             int_dtype = torch.long if (n_labels > 2) else torch.int32
             self.labels = torch.tensor(data["labels"], dtype=int_dtype)
         if "timestamps" in data:
-            self.timestamps = torch.tensor(data["timestamps"], dtype=torch.float32)
+            self.timestamps = torch.tensor(data["timestamps"], dtype=torch.float64)
         if "clip_ids" in data:
             self.clip_ids = torch.tensor(data["clip_ids"], dtype=torch.int32)
         if "clip_descriptions" in data:
