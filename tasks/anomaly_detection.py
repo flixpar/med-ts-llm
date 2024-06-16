@@ -13,6 +13,8 @@ from sklearn.metrics import (
 from numba import jit
 from bayes_opt import BayesianOptimization
 
+import plotly.graph_objects as go
+
 from tqdm import tqdm
 
 from .base import BaseTask
@@ -61,6 +63,9 @@ class AnomalyDetectionTask(BaseTask):
         scores = {f"val/{metric}": value for metric, value in scores.items()}
         self.log_scores(scores)
 
+        preds_fig = self.plot_predictions(results)
+        self.logger.log_figure(preds_fig, "val/predictions")
+
         return scores
 
     def test(self):
@@ -72,6 +77,9 @@ class AnomalyDetectionTask(BaseTask):
         scores = anom_scores | recon_scores | thresholds
         scores = {f"test/{metric}": value for metric, value in scores.items()}
         self.log_scores(scores)
+
+        preds_fig = self.plot_predictions(results)
+        self.logger.log_figure(preds_fig, "test/predictions")
 
         return scores
 
@@ -182,6 +190,18 @@ class AnomalyDetectionTask(BaseTask):
             case _:
                 raise ValueError(f"Invalid loss function selection: {self.config.training.loss}")
         return self.loss_fn
+    
+    def plot_predictions(self, results, xrange=(0, 2_000)):
+        preds, targets = results["recon_preds"], results["recon_targets"]
+        xinds = slice(*xrange)
+        n_features = preds.size(-1)
+
+        fig = go.Figure()
+        for i in range(min(n_features, 3)):
+            fig.add_trace(go.Scatter(x=torch.arange(*xrange), y=targets[xinds, i], mode="lines", name=f"target-{i+1}"))
+            fig.add_trace(go.Scatter(x=torch.arange(*xrange), y=preds[xinds, i], mode="lines", name=f"pred-{i+1}"))
+
+        return fig
 
 
 def adjust_anomalies(pred, gt):
