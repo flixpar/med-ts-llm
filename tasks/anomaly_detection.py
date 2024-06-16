@@ -10,6 +10,7 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
+from numba import jit
 from bayes_opt import BayesianOptimization
 
 from tqdm import tqdm
@@ -182,30 +183,38 @@ class AnomalyDetectionTask(BaseTask):
                 raise ValueError(f"Invalid loss function selection: {self.config.training.loss}")
         return self.loss_fn
 
-@torch.jit.script
+
 def adjust_anomalies(pred, gt):
-    with torch.no_grad():
-        anomaly_state = False
-        for i in range(len(gt)):
-            if gt[i] == 1 and pred[i] == 1 and not anomaly_state:
-                anomaly_state = True
-                for j in range(i, 0, -1):
-                    if gt[j] == 0:
-                        break
-                    else:
-                        if pred[j] == 0:
-                            pred[j] = 1
-                for j in range(i, len(gt)):
-                    if gt[j] == 0:
-                        break
-                    else:
-                        if pred[j] == 0:
-                            pred[j] = 1
-            elif gt[i] == 0:
-                anomaly_state = False
-            if anomaly_state:
-                pred[i] = 1
-        return pred
+    if use_torch := isinstance(pred, torch.Tensor):
+        pred, gt = pred.numpy(), gt.numpy()
+    pred = _adjust_anomalies(pred, gt)
+    if use_torch:
+        pred = torch.tensor(pred, dtype=torch.int)
+    return pred
+
+@jit(nopython=True)
+def _adjust_anomalies(pred, gt):
+    anomaly_state = False
+    for i in range(len(gt)):
+        if gt[i] == 1 and pred[i] == 1 and not anomaly_state:
+            anomaly_state = True
+            for j in range(i, 0, -1):
+                if gt[j] == 0:
+                    break
+                else:
+                    if pred[j] == 0:
+                        pred[j] = 1
+            for j in range(i, len(gt)):
+                if gt[j] == 0:
+                    break
+                else:
+                    if pred[j] == 0:
+                        pred[j] = 1
+        elif gt[i] == 0:
+            anomaly_state = False
+        if anomaly_state:
+            pred[i] = 1
+    return pred
 
 def running_mean(xs, window_size):
     if window_size % 2 == 0:
@@ -227,5 +236,5 @@ def optimize_threshold(scores, labels):
         random_state = 0,
         verbose = 0,
     )
-    optimizer.maximize(init_points=5, n_iter=10)
+    optimizer.maximize(init_points=10, n_iter=20)
     return optimizer.max["params"]["q"]

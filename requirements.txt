@@ -1,10 +1,11 @@
-numpy >= 1.22.0
+numpy >= 1.22.0, < 1.25
 pandas >= 2.0.0
 plotly >= 5.19.0
 matplotlib
 plotly
 tqdm
 toml
+numba
 
 torch >= 2.2.1
 torchvision
