@@ -1,4 +1,10 @@
-# MedTSLLM: Medical Time Series Analysis with LLMs
+# MedTsLLM: Leveraging LLMs for Multimodal Medical Time Series Analysis
+
+Our paper has been published at MLHC 2024! [MedTsLLM: Leveraging LLMs for Multimodal Medical Time Series Analysis](https://arxiv.org/abs/2408.07773)
+Nimeesha Chan, Felix Parker, William Bennett, Tianyi Wu, Mung Yao Jia, James Fackler, Kimia Ghobadi
+
+
+## Instructions
 
 **Run with:**
 ```
@@ -6,7 +12,7 @@ python3 train.py configs/config_default.toml
 ```
 
 
-## Setup
+### Setup
 
 ### Datasets
 Create folder `data/` and add any datasets.
