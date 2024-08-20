@@ -110,11 +110,19 @@ class VentilatorSemanticSegmentationDataset(VentilatorDataset, SemanticSegmentat
         basepath = Path(__file__).parent / "../data/ventilator/v4/"
         clip_list = self.train_clips if split == "train" else self.test_clips
 
+        if split == "inference":
+            basepath = Path(__file__).parent / "../data/ventilator/v1/"
+            fns = basepath.glob("*.csv")
+            clip_list = [fn.stem for fn in fns]
+
         dfs = []
         for clip_id in clip_list:
             fn = basepath / f"{clip_id}.csv"
             df = pd.read_csv(fn)
-            df = df[df.label >= 0]
+            if split != "inference":
+                df = df[df.label >= 0]
+            else:
+                df["label"] = -1
             df["clip_id"] = parse_clip_id(clip_id)
             dfs.append(df)
         data = pd.concat(dfs, ignore_index=True)
