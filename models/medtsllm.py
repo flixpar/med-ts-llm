@@ -21,7 +21,7 @@ import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
-class TimeLLM(nn.Module):
+class MedTsLLM(nn.Module):
 
     supported_tasks = ["forecasting", "reconstruction", "anomaly_detection", "semantic_segmentation", "segmentation", "pretraining"]
     supported_modes = ["univariate", "multivariate"]
@@ -29,7 +29,7 @@ class TimeLLM(nn.Module):
     def __init__(self, config, dataset):
         super().__init__()
         self.config = config
-        self.model_config = self.config.models.timellm
+        self.model_config = self.config.models.medtsllm if "medtsllm" in self.config.models else self.config.models.timellm
 
         self.device = None
 
