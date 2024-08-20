@@ -39,6 +39,9 @@ class BaseLogger(ABC):
         }
         torch.save(state, modeldir / f"{name}.pt")
 
+        if hasattr(self.trainer.model, "lora_enabled") and self.trainer.model.lora_enabled:
+            self.trainer.model.llm.save_pretrained(modeldir / f"{name}-lora.safetensors")
+
     def update_config(self, cfg):
         if not isinstance(cfg, dict):
             cfg = cfg.to_dict()

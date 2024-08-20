@@ -9,6 +9,9 @@ from transformers import AutoConfig, AutoModel, AutoTokenizer
 from transformers import BitsAndBytesConfig
 transformers.logging.set_verbosity_error()
 
+from peft import LoraConfig, TaskType
+from peft import get_peft_model
+
 from .layers.embed import PatchEmbedding
 from .layers.RevIN import RevIN
 
@@ -163,6 +166,24 @@ class TimeLLM(nn.Module):
             # device_map = self.device,
         )
 
+        if "lora" in self.model_config and self.model_config.lora.enabled and self.llm_enabled:
+            print("Setting up LoRA...")
+            self.lora_enabled = True
+            lora_cfg = self.model_config.lora
+            assert lora_cfg.layers == "auto"
+            peft_config = LoraConfig(
+                task_type = TaskType.FEATURE_EXTRACTION,
+                inference_mode = False,
+                r = lora_cfg.rank,
+                lora_alpha = lora_cfg.alpha,
+                init_lora_weights = lora_cfg.get("init", True),
+                lora_dropout = lora_cfg.get("dropout", 0.0),
+                use_rslora = lora_cfg.get("rslora", True),
+            )
+            llm = get_peft_model(llm, peft_config)
+            llm.print_trainable_parameters()
+        else:
+            self.lora_enabled = False
 
         tokenizer = AutoTokenizer.from_pretrained(
             self.llm_id,
@@ -189,8 +210,9 @@ class TimeLLM(nn.Module):
             self.llm = llm
             self.tokenizer = tokenizer
 
-            for param in self.llm.parameters():
-                param.requires_grad = False
+            if not self.lora_enabled:
+                for param in self.llm.parameters():
+                    param.requires_grad = False
 
     def state_dict(self):
         state_dict = super().state_dict()
