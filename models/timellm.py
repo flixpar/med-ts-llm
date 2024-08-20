@@ -24,9 +24,11 @@ class TimeLLM(nn.Module):
     supported_modes = ["univariate", "multivariate"]
 
     def __init__(self, config, dataset):
-        super(TimeLLM, self).__init__()
+        super().__init__()
         self.config = config
         self.model_config = self.config.models.timellm
+
+        self.device = None
 
         self.pred_len = self.config.pred_len
         self.seq_len = self.config.history_len
@@ -157,8 +159,10 @@ class TimeLLM(nn.Module):
             attn_implementation = attn_implementation,
             cache_dir = cache_dir,
             trust_remote_code = trust_remote_code,
-            # device_map = "auto",
+            device_map = "auto",
+            # device_map = self.device,
         )
+
 
         tokenizer = AutoTokenizer.from_pretrained(
             self.llm_id,
@@ -230,19 +234,20 @@ class TimeLLM(nn.Module):
         x_enc = x_enc.permute(0, 2, 1).contiguous() # [bs, n_features, seq_len]
         enc_out, _ = self.patch_embedding(x_enc)    # [bs * n_features, n_patches, d_patch]
 
+        n_patches = enc_out.size(1)
         if self.covariate_mode == "concat":
-            enc_out = enc_out.reshape(bs, n_features, self.n_patches, self.d_patch)
+            enc_out = enc_out.reshape(bs, n_features, n_patches, self.d_patch)
             enc_out = enc_out.permute(0, 2, 1, 3) # [bs, n_patches, n_features, d_patch]
-            enc_out = enc_out.reshape(bs, self.n_patches, n_features * self.d_patch)
+            enc_out = enc_out.reshape(bs, n_patches, n_features * self.d_patch)
 
         source_embeddings = self.mapping_layer(self.word_embeddings.permute(1, 0)).permute(1, 0)
         enc_out = self.reprogramming_layer(enc_out, source_embeddings, source_embeddings) # [bs * n_features, n_patches, d_llm]
 
         if self.covariate_mode == "add":
-            enc_out = enc_out.reshape(bs, n_features, self.n_patches, self.d_llm)
+            enc_out = enc_out.reshape(bs, n_features, n_patches, self.d_llm)
             enc_out = enc_out.mean(dim=1)                           # [bs, n_patches, d_llm]
         elif self.covariate_mode == "weighted-average":
-            enc_out = enc_out.reshape(bs, n_features, self.n_patches, self.d_llm)
+            enc_out = enc_out.reshape(bs, n_features, n_patches, self.d_llm)
             enc_out = enc_out.permute(0, 2, 3, 1)                     # [bs, n_patches, d_llm, n_features]
             enc_out = self.feature_weighting(enc_out)                 # [bs, n_patches, d_llm, 1]
             enc_out = enc_out.squeeze(-1)                             # [bs, n_patches, d_llm]
@@ -333,13 +338,17 @@ class TimeLLM(nn.Module):
         else:
             task_prompt = ""
 
+        bos = self.tokenizer.bos_token if self.tokenizer.bos_token is not None else ""
+
         prompts = []
         for b in range(bs):
             parts = [
+                bos,
                 dataset_prompt,
                 clip_prompts[b],
                 input_stats_prompts[b],
                 task_prompt,
+                "Time series:",
             ]
             prompt = " ".join([p for p in parts if p])
             prompt = "<|start_prompt|>" + prompt + "<|end_prompt|>"
