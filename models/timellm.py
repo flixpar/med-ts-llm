@@ -260,9 +260,7 @@ class TimeLLM(nn.Module):
 
         return pred
 
-    def predict(self, inputs):
-        x_enc = inputs["x_enc"]
-
+    def encode_ts(self, x_enc):
         if x_enc.ndim == 2:
             x_enc = x_enc.unsqueeze(-1)
 
@@ -296,23 +294,61 @@ class TimeLLM(nn.Module):
             enc_out = enc_out.permute(0, 2, 1, 3)                     # [bs, n_patches, n_features, d_llm]
             enc_out = enc_out.reshape(bs, -1, self.d_llm)             # [bs, n_patches * n_features, d_llm]
 
-        if self.llm_enabled:
-            prompt = self.build_prompt(inputs)
-            prompt = self.tokenizer(prompt, return_tensors="pt", padding=True, truncation=True, max_length=2048).input_ids
-            prompt_embeddings = self.llm.get_input_embeddings()(prompt.to(x_enc.device)) # [bs, n_tok, d_llm]
-            prompt_embeddings = prompt_embeddings.to(enc_out.dtype)
+        return enc_out
 
-            if self.covariate_mode == "independent" or self.covariate_mode == "merge-end":
-                prompt_embeddings = prompt_embeddings.repeat_interleave(n_features, dim=0)
+    def encode_text(self, prompt):
+        prompt = self.tokenizer(prompt, return_tensors="pt", padding=False, truncation=False).input_ids
+        prompt_embeddings = self.llm.get_input_embeddings()(prompt.to(self.device))
+        return prompt_embeddings
 
-            if self.llm.config.is_encoder_decoder:
-                dec_out = self.llm(inputs_embeds=prompt_embeddings, decoder_inputs_embeds=enc_out).last_hidden_state  # [bs, n_tok + n_patches, d_llm]
-            else:
-                llm_enc_out = torch.cat([prompt_embeddings, enc_out], dim=1)
-                dec_out = self.llm(inputs_embeds=llm_enc_out).last_hidden_state  # [bs, n_tok + n_patches, d_llm]
-            dec_out = dec_out.to(x_enc.dtype)
+    def pad_sequence(self, seq, seq_len):
+        pad_token_id = self.tokenizer.pad_token_id
+        pad_embedding = self.llm.get_input_embeddings()(torch.tensor(pad_token_id, device=self.device))
+        if seq.size(1) < seq_len:
+            pad_len = seq_len - seq.size(1)
+            pad = pad_embedding.unsqueeze(0).expand(seq.size(0), pad_len, -1)
+            seq = torch.cat([pad, seq], dim=1)
+        return seq
+
+    def encode_part(self, x):
+        if isinstance(x, str):
+            return self.encode_text(x)
+        elif isinstance(x, torch.Tensor):
+            return self.encode_ts(x)
         else:
-            dec_out = self.llm_replacement(enc_out)
+            raise ValueError(f"Unknown input type: {type(x)}")
+
+    def predict(self, inputs):
+        x_enc = inputs["x_enc"]
+        bs, seq_len, n_features = x_enc.size()
+
+        if self.device is None:
+            self.device = x_enc.device
+
+        prompts = self.build_prompt(inputs)
+
+        if len(prompts[0]) > 0:
+            prompt_enc = [[self.encode_part(p) for p in prompt] for prompt in prompts]
+            prompt_enc = [torch.cat(enc, dim=1) for enc in prompt_enc]
+
+            max_len = max([enc.size(1) for enc in prompt_enc])
+            prompt_enc = [self.pad_sequence(enc, max_len) for enc in prompt_enc]
+
+            prompt_enc = torch.cat(prompt_enc, dim=0)
+        else:
+            prompt_enc = torch.zeros((bs, 0, self.d_llm), device=x_enc.device, dtype=x_enc.dtype)
+
+        x_enc = self.encode_ts(x_enc)
+
+        if self.covariate_mode == "independent" or self.covariate_mode == "merge-end":
+            prompt_enc = prompt_enc.repeat_interleave(n_features, dim=0)
+
+        if self.llm.config.is_encoder_decoder:
+            dec_out = self.llm(inputs_embeds=prompt_enc, decoder_inputs_embeds=x_enc).last_hidden_state  # [bs, n_tok + n_patches, d_llm]
+        else:
+            enc = torch.cat([prompt_enc, x_enc], dim=1)
+            dec_out = self.llm(inputs_embeds=enc).last_hidden_state  # [bs, n_tok + n_patches, d_llm]
+        dec_out = dec_out.to(x_enc.dtype)
 
         dec_out = dec_out[:, -self.n_patches:, :]
         match self.embedding_downsample_mode:
@@ -352,16 +388,21 @@ class TimeLLM(nn.Module):
 
         cfg = self.model_config.get("prompting")
         if cfg is None:
-            cfg = {"dataset": True, "clip": True, "input_stats": True, "task": True, "input_stats_dim": 0, "input_stats_select": "all"}
+            cfg = {"dataset": True, "clip": True, "input_stats": True, "task": True, "examples": False, "input_stats_dim": 0, "input_stats_select": "all"}
             cfg = dict_to_object(cfg)
 
-        if not (cfg.dataset or cfg.clip or cfg.input_stats or cfg.task):
-            return [""] * bs
+        if not (cfg.dataset or cfg.clip or cfg.input_stats or cfg.task or cfg.examples):
+            return [[] for _ in range(bs)]
 
         if cfg.dataset:
             dataset_prompt = f"Dataset: {self.dataset_description}"
         else:
             dataset_prompt = ""
+
+        if cfg.examples:
+            example_prompts = inputs["examples"]
+        else:
+            example_prompts = [("",)] * bs
 
         if cfg.clip:
             clip_prompts = inputs.get("descriptions", [""] * bs)
@@ -385,14 +426,15 @@ class TimeLLM(nn.Module):
             parts = [
                 bos,
                 dataset_prompt,
+                *example_prompts[b],
                 clip_prompts[b],
                 input_stats_prompts[b],
                 task_prompt,
                 "Time series:",
             ]
-            prompt = " ".join([p for p in parts if p])
-            prompt = "<|start_prompt|>" + prompt + "<|end_prompt|>"
-            prompts.append(prompt)
+            parts = [p for p in parts if p != ""]
+            parts = [(p+" " if isinstance(p, str) and (i != 0) else p) for i, p in enumerate(parts)]
+            prompts.append(parts)
 
         return prompts
 
