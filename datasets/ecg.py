@@ -2,6 +2,9 @@ from abc import ABC
 from pathlib import Path
 import pandas as pd
 
+import torch
+from torch.utils.data import default_collate
+
 from .base import (
     BaseDataset,
     ForecastDataset,
@@ -83,6 +86,28 @@ class ECGMITAnomalyDetectionDataset(ECGMITDataset, AnomalyDetectionDataset):
 
 
 class ECGMITSegmentationDataset(ECGMITDataset, SegmentationDataset):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.examples_enabled = (self.config.model == "timellm" and self.config.models.timellm.get("prompting", {}).get("examples", False))
+        if self.examples_enabled:
+            max_examples = self.config.models.timellm.get("prompting", {}).get("example_pool", 1024)
+            self.examples = self.get_examples(max_examples)
+            self.n_examples = len(self.examples)
+
+    def get_examples(self, n=None):
+        inds = self.labels.nonzero().flatten()
+        periods = inds.unfold(0, 2, 1)
+
+        if n is not None:
+            periods = periods[:n,:]
+
+        periods = periods.tolist()
+        periods = [slice(*p) for p in periods]
+
+        examples = [self.data[p,:] for p in periods]
+        return examples
+
     def get_data(self, split=None):
         split = split or self.split
 
@@ -104,7 +129,24 @@ class ECGMITSegmentationDataset(ECGMITDataset, SegmentationDataset):
         descriptions = descriptions["data_desc"].to_dict()
         descriptions = {k: f"Patient description: {v}" for k, v in descriptions.items()}
 
-        return {"data": features, "labels": labels, "clip_ids": clip_ids, "clip_descriptions": descriptions}
+        return {
+            "data": features,
+            "labels": labels,
+            "clip_ids": clip_ids,
+            "clip_descriptions": descriptions,
+        }
+
+    def collate_fn(self, batch):
+        if not self.examples_enabled:
+            return default_collate(batch)
+
+        examples = [b["examples"] for b in batch]
+        batch = [{k: v for k, v in b.items() if k != "examples"} for b in batch]
+
+        batch = default_collate(batch)
+        batch["examples"] = [(ex[0], ex[1].unsqueeze(0)) for ex in examples]
+
+        return batch
 
     def __getitem__(self, idx):
         idx_range = self.inverse_index(idx)
@@ -115,7 +157,13 @@ class ECGMITSegmentationDataset(ECGMITDataset, SegmentationDataset):
         clip_id = self.clip_ids[idx_range[0]].item()
         desc = self.clip_descriptions[clip_id]
 
-        return {"x_enc": x, "labels": y, "descriptions": desc}
+        if self.examples_enabled:
+            ex_idx = idx % self.n_examples
+            example = ("Example segment:", self.examples[ex_idx])
+        else:
+            example = torch.tensor([])
+
+        return {"x_enc": x, "labels": y, "descriptions": desc, "examples": example}
 
 
 ecg_datasets = {
