@@ -10,6 +10,7 @@ venv/
 
 # data
 data/
+inputs/
 
 # logs
 outputs/
