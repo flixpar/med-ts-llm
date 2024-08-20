@@ -1,14 +1,16 @@
 DEBUG = false
 
-task = "reconstruction" # options: forecasting, anomaly_detection, semantic_segmentation, segmentation, pretraining
-model = "timellm"          # options: timellm, gpt4ts, dlinear, patchtst, fedformer, timesnet
+study = "baseline-models-dreams"
+model = "gpt4ts" # gpt4ts, dlinear, patchtst, fedformer, timesnet
+
+task = "anomaly_detection"
 
 history_len = 128
 pred_len = 128
 
 
 [data]
-dataset = "ECG"
+dataset = "dreams"
 mode = "multivariate"
 cols = "all"
 normalize = true
@@ -18,33 +20,26 @@ step = 64
 [training]
 epochs = 10
 batch_size = 16
-optimizer = "ranger"
-learning_rate = 0.001
+optimizer = "adam"
+learning_rate = 1e-4
 dropout = 0.1
 loss = "mse"
 
-eval_metric = "mse"
+eval_metric = "recon_mse"
 eval_metric_direction = "min"
 
 
-[models.timellm]
-d_model = 32
-d_ff = 64
-n_heads = 8
-num_tokens = 1000
-covariate_mode = "add"                # options: univariate, concat, add, interleave, independent, independent-weighted
-embedding_downsample_mode = "linear"  # options: linear, truncate, average
+[datasets.dreams]
+version = "v2"
+features = "eeg"
+labels = "eeg"
 
-[models.timellm.patching]
-patch_len = 16
-stride = 8
 
-[models.timellm.llm]
-enabled = true
-llm = "state-spaces/mamba-1.4b-hf"
-load_in_4bit = false
-load_in_8bit = false
-llm_layers = 36
+[tasks.anomaly_detection]
+threshold = "auto"
+score_metric = "mse"
+normalize_by_feature = false
+normalize_moving_window = 0
 
 
 [models.gpt4ts]
@@ -100,6 +95,6 @@ top_k = 3
 [setup]
 seed = 0
 device = "auto"
-dtype = "bf16"
+dtype = "fp32"
 num_workers = "auto"
 logger = "wandb"

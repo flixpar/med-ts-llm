@@ -1,50 +1,41 @@
 DEBUG = false
 
-task = "forecasting" # options: forecasting, anomaly_detection, semantic_segmentation, segmentation, pretraining
-model = "timellm"    # options: timellm, gpt4ts, dlinear, patchtst, fedformer, timesnet
+study = "baseline-models-ecgmit-seg"
+model = "gpt4ts" # gpt4ts, dlinear, patchtst, fedformer, timesnet
+
+task = "segmentation"
 
 history_len = 256
-pred_len = 128
+pred_len = 256
 
 
 [data]
-dataset = "ETTh1"
+dataset = "ECG"
 mode = "multivariate"
 cols = "all"
 normalize = true
-step = 64
+step = 128
 
 
 [training]
 epochs = 10
 batch_size = 16
-optimizer = "ranger"
+optimizer = "adam"
 learning_rate = 1e-4
 dropout = 0.1
-loss = "mse"
+loss = "bce"
 
-eval_metric = "mse"
-eval_metric_direction = "min"
+eval_metric = "segment_miou"
+eval_metric_direction = "max"
 
 
-[models.timellm]
-d_model = 32
-d_ff = 64
-n_heads = 8
-num_tokens = 1000
-covariate_mode = "add"                 # options: univariate, concat, add, interleave, independent, independent-weighted
-embedding_downsample_mode = "linear"   # options: linear, truncate, average
+[datasets.ECG]
+version = "v2"
 
-[models.timellm.patching]
-patch_len = 16
-stride = 8
 
-[models.timellm.llm]
-enabled = true
-llm = "state-spaces/mamba-1.4b-hf"
-load_in_4bit = false
-load_in_8bit = false
-llm_layers = 36
+[tasks.segmentation]
+mode = "boundary-prediction"
+distance_thresh = "auto"
 
 
 [models.gpt4ts]
@@ -100,6 +91,6 @@ top_k = 3
 [setup]
 seed = 0
 device = "auto"
-dtype = "bf16"
+dtype = "fp32"
 num_workers = "auto"
 logger = "wandb"

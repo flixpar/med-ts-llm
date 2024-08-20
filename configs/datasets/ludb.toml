@@ -1,0 +1,67 @@
+DEBUG = false
+
+task = "semantic_segmentation"
+model = "medtsllm"
+
+history_len = 512
+pred_len = 512
+
+
+[data]
+dataset = "ludb"
+mode = "multivariate"
+cols = "all"
+normalize = true
+step = 256
+
+
+[training]
+epochs = 10
+batch_size = 16
+optimizer = "adam"
+learning_rate = 1e-4
+dropout = 0.1
+loss = "ce"
+
+eval_metric = "iou"
+eval_metric_direction = "max"
+
+
+[datasets.ludb]
+version = "v3"
+
+
+[models.timellm]
+d_model = 32
+d_ff = 128
+n_heads = 8
+num_tokens = 1024
+covariate_mode = "univariate"
+embedding_downsample_mode = "linear"
+
+[models.timellm.patching]
+patch_len = 16
+stride = 8
+
+[models.timellm.prompting]
+input_stats_dim = 0
+input_stats_select = "all"
+dataset = true
+task = true
+clip = false
+input_stats = false
+
+[models.timellm.llm]
+enabled = true
+llm = "meta-llama/Llama-2-7b-hf"
+load_in_4bit = false
+load_in_8bit = false
+llm_layers = -1
+
+
+[setup]
+seed = 0
+device = "auto"
+dtype = "mixed"
+num_workers = "auto"
+logger = "wandb"
