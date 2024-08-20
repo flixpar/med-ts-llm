@@ -108,6 +108,24 @@ class TimeLLM(nn.Module):
                 nn.LayerNorm(self.d_ff),
             )
 
+        n_params_total = sum(p.numel() for p in self.parameters())
+        n_params_llm = sum(p.numel() for p in self.llm.parameters()) if self.llm_enabled else 0
+        n_params_trainable = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        print(f"Total number of parameters: {n_params_total:,}")
+        print(f"Number of trainable parameters: {n_params_trainable:,}")
+        print(f"Number of parameters in LLM: {n_params_llm:,}")
+
+        layer_names = {
+            "norm": self.normalize_layers,
+            "mapping": self.mapping_layer,
+            "patch_emb": self.patch_embedding,
+            "reprogramming": self.reprogramming_layer,
+            "output": self.output_projection,
+        }
+        n_params_layers = {k: sum(p.numel() for p in v.parameters()) for k, v in layer_names.items()}
+        for k, v in n_params_layers.items():
+            print(f"Number of parameters in {k} layer: {v:,}")
+
     def setup_llm(self):
         self.llm_enabled = self.model_config.llm.enabled
         self.llm_id = self.model_config.llm.llm
