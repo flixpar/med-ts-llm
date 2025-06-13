@@ -18,10 +18,11 @@ import plotly.graph_objects as go
 from tqdm import tqdm
 
 from .base import BaseTask
+from .interpretability_mixin import TaskInterpretabilityMixin
 from utils import dict_to_object
 
 
-class AnomalyDetectionTask(BaseTask):
+class AnomalyDetectionTask(TaskInterpretabilityMixin, BaseTask):
 
     def __init__(self, run_id, config, newrun=True):
         self.task = "anomaly_detection"
@@ -66,6 +67,13 @@ class AnomalyDetectionTask(BaseTask):
         preds_fig = self.plot_predictions(results)
         self.logger.log_figure(preds_fig, "val/predictions")
 
+        try:
+            sample_inputs = next(iter(self.val_dataloader))
+            sample_inputs = self.prepare_batch(sample_inputs)
+            self.log_interpretability(sample_inputs, prefix="val")
+        except Exception:
+            pass
+
         return scores
 
     def test(self):
@@ -80,6 +88,13 @@ class AnomalyDetectionTask(BaseTask):
 
         preds_fig = self.plot_predictions(results)
         self.logger.log_figure(preds_fig, "test/predictions")
+
+        try:
+            sample_inputs = next(iter(self.test_dataloader))
+            sample_inputs = self.prepare_batch(sample_inputs)
+            self.log_interpretability(sample_inputs, prefix="test")
+        except Exception:
+            pass
 
         return scores
 

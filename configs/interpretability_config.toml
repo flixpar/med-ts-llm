@@ -1,0 +1,4 @@
+[interpretability]
+enable = true
+capture_llm_attention = true
+capture_gradients = false

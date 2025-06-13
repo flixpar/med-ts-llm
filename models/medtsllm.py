@@ -16,18 +16,20 @@ from .layers.embed import PatchEmbedding
 from .layers.RevIN import RevIN
 
 from utils import dict_to_object
+from utils.interpretability import ModelInterpretabilityMixin
 
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
-class MedTsLLM(nn.Module):
+class MedTsLLM(ModelInterpretabilityMixin, nn.Module):
 
     supported_tasks = ["forecasting", "reconstruction", "anomaly_detection", "semantic_segmentation", "segmentation", "pretraining"]
     supported_modes = ["univariate", "multivariate"]
 
     def __init__(self, config, dataset):
-        super().__init__()
+        nn.Module.__init__(self)
+        ModelInterpretabilityMixin.__init__(self)
         self.config = config
         self.model_config = self.config.models.medtsllm if "medtsllm" in self.config.models else self.config.models.timellm
 
@@ -279,7 +281,11 @@ class MedTsLLM(nn.Module):
             enc_out = enc_out.reshape(bs, n_patches, n_features * self.d_patch)
 
         source_embeddings = self.mapping_layer(self.word_embeddings.permute(1, 0)).permute(1, 0)
-        enc_out = self.reprogramming_layer(enc_out, source_embeddings, source_embeddings) # [bs * n_features, n_patches, d_llm]
+        if self.interpretability_enabled:
+            enc_out, attn = self.reprogramming_layer(enc_out, source_embeddings, source_embeddings, store_attention=True)
+            self._stored_cross_attention = attn.detach().cpu()
+        else:
+            enc_out = self.reprogramming_layer(enc_out, source_embeddings, source_embeddings)
 
         if self.covariate_mode == "add":
             enc_out = enc_out.reshape(bs, n_features, n_patches, self.d_llm)
@@ -563,7 +569,7 @@ class ReprogrammingLayer(nn.Module):
         self.n_heads = n_heads
         self.dropout = nn.Dropout(attention_dropout)
 
-    def forward(self, target_embedding, source_embedding, value_embedding):
+    def forward(self, target_embedding, source_embedding, value_embedding, store_attention=False):
         B, L, _ = target_embedding.shape
         S, _ = source_embedding.shape
         H = self.n_heads
@@ -572,20 +578,27 @@ class ReprogrammingLayer(nn.Module):
         source_embedding = self.key_projection(source_embedding).view(S, H, -1)
         value_embedding = self.value_projection(value_embedding).view(S, H, -1)
 
-        out = self.reprogramming(target_embedding, source_embedding, value_embedding)
+        out, attn = self.reprogramming(target_embedding, source_embedding, value_embedding, store_attention)
 
         out = out.reshape(B, L, -1)
 
-        return self.out_projection(out)
+        out = self.out_projection(out)
+        if store_attention:
+            return out, attn
+        return out
 
-    def reprogramming(self, target_embedding, source_embedding, value_embedding):
+    def reprogramming(self, target_embedding, source_embedding, value_embedding, store_attention=False):
         B, L, H, E = target_embedding.shape
 
         scale = 1. / math.sqrt(E)
 
         scores = torch.einsum("blhe,she->bhls", target_embedding, source_embedding)
 
-        A = self.dropout(torch.softmax(scale * scores, dim=-1))
+        A = torch.softmax(scale * scores, dim=-1)
+        attn = A
+        A = self.dropout(A)
         reprogramming_embedding = torch.einsum("bhls,she->blhe", A, value_embedding)
 
-        return reprogramming_embedding
+        if store_attention:
+            return reprogramming_embedding, attn
+        return reprogramming_embedding, None
